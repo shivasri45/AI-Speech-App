@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime audio/data artifacts
+uploads/
+temp/
+outputs/
+
+# Model and alignment assets
+mfa_models/
+*.TextGrid
+
+# Logs
+*.log
+logs/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Docker/local database data
+postgres_data/
+
+# Node/frontend tooling, if added later
+node_modules/
+dist/
+build/
