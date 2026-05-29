@@ -8,7 +8,9 @@ from app.utils.ffmpeg_utils import get_ffmpeg_command
 
 def preprocess_audio(input_path: str):
 
-    output_filename = f"processed_{os.path.basename(input_path)}"
+    input_base_name = os.path.splitext(os.path.basename(input_path))[0]
+
+    output_filename = f"processed_{input_base_name}.wav"
     output_path = os.path.join("temp", output_filename)
 
     command = [

@@ -13,3 +13,5 @@ soundfile
 ffmpeg-python
 numpy
 torch
+openai-whisper
+textgrid

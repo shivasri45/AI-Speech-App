@@ -6,16 +6,22 @@ from fastapi import File
 import json
 from pathlib import Path
 
+from app.core.logger import logger
 from app.schemas.pronunciation_schema import AnalyzeResponse
 from app.schemas.pronunciation_schema import WordTimestamp
 
 from app.services.storage_service import save_upload_file
 from app.services.audio_service import preprocess_audio
 
+from app.pronunciation.mfa_service import parse_textgrid
+from app.pronunciation.mfa_service import run_mfa_alignment
+from app.pronunciation.phoneme_service import get_expected_word_phonemes
 from app.pronunciation.whisper_service import transcribe_audio
 from app.pronunciation.transcript_cleaner import normalize_transcript
 from app.pronunciation.scoring_service import calculate_clarity_score
 from app.pronunciation.scoring_service import calculate_pace_wpm
+from app.pronunciation.scoring_service import calculate_pronunciation_score
+from app.pronunciation.scoring_service import build_word_scores
 from app.pronunciation.scoring_service import compare_expected_to_transcript
 
 router = APIRouter()
@@ -107,10 +113,52 @@ async def analyze_audio(
 
     mistakes = []
 
+    expected_phonemes = []
+
+    phoneme_timeline = []
+
+    word_scores = []
+
+    mfa_available = False
+
+    mfa_error = None
+
     if expected_text:
-        pronunciation_score, mistakes = compare_expected_to_transcript(
+        word_match_score, mistakes = compare_expected_to_transcript(
             expected_text,
             transcript
+        )
+
+        pronunciation_score = word_match_score
+
+        expected_phonemes = get_expected_word_phonemes(expected_text)
+
+        try:
+            textgrid_path = run_mfa_alignment(
+                processed_audio_path,
+                expected_text
+            )
+
+            phoneme_timeline = parse_textgrid(textgrid_path)
+
+            mfa_available = True
+
+        except Exception as error:
+            logger.warning(f"MFA alignment unavailable: {error}")
+
+            mfa_error = str(error)
+
+        word_scores = build_word_scores(
+            expected_text,
+            transcript,
+            words_output,
+            expected_phonemes,
+            mfa_available
+        )
+
+        pronunciation_score = calculate_pronunciation_score(
+            word_match_score,
+            word_scores
         )
 
     return AnalyzeResponse(
@@ -125,5 +173,10 @@ async def analyze_audio(
         pronunciation_score=pronunciation_score,
         clarity_score=clarity_score,
         pace_wpm=pace_wpm,
-        mistakes=mistakes
+        mistakes=mistakes,
+        expected_phonemes=expected_phonemes,
+        phoneme_timeline=phoneme_timeline,
+        word_scores=word_scores,
+        mfa_available=mfa_available,
+        mfa_error=mfa_error
     )

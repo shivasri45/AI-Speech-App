@@ -15,6 +15,7 @@ const paceScore = document.querySelector("#paceScore");
 const transcriptText = document.querySelector("#transcriptText");
 const mistakesList = document.querySelector("#mistakesList");
 const wordsList = document.querySelector("#wordsList");
+const phonemesList = document.querySelector("#phonemesList");
 const waveCanvas = document.querySelector("#waveCanvas");
 const modeButtons = document.querySelectorAll(".mode-button");
 
@@ -170,6 +171,7 @@ function renderResult(result) {
 
   mistakesList.innerHTML = "";
   wordsList.innerHTML = "";
+  phonemesList.innerHTML = "";
 
   if (!result.mistakes.length) {
     const empty = document.createElement("p");
@@ -191,17 +193,53 @@ function renderResult(result) {
     mistakesList.appendChild(item);
   });
 
-  result.words.forEach((word) => {
+  const wordScores = result.word_scores && result.word_scores.length
+    ? result.word_scores
+    : result.words.map((word) => ({
+      word: word.word,
+      heard_word: word.word,
+      score: word.probability * 100,
+      confidence_score: word.probability * 100,
+      expected_phonemes: [],
+      feedback: `${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`
+    }));
+
+  wordScores.forEach((wordScore) => {
     const item = document.createElement("div");
     item.className = "word-item";
+    const phonemes = wordScore.expected_phonemes && wordScore.expected_phonemes.length
+      ? wordScore.expected_phonemes.join(" ")
+      : "No phoneme data";
+
     item.innerHTML = `
       <div>
-        <strong>${word.word}</strong>
-        <span>${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s</span>
+        <strong>${wordScore.word} -> ${wordScore.heard_word || "missing"}</strong>
+        <span>${phonemes}</span>
+        <p>${wordScore.feedback}</p>
       </div>
-      <span class="pill">${Math.round(word.probability * 100)}%</span>
+      <span class="pill">${Math.round(wordScore.score)}%</span>
     `;
     wordsList.appendChild(item);
+  });
+
+  if (!result.phoneme_timeline || !result.phoneme_timeline.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = result.mfa_available
+      ? "No phoneme timings returned."
+      : "MFA not available yet. Install MFA models to enable phoneme timing.";
+    phonemesList.appendChild(empty);
+    return;
+  }
+
+  result.phoneme_timeline.forEach((phoneme) => {
+    const item = document.createElement("div");
+    item.className = "phoneme-item";
+    item.innerHTML = `
+      <strong>${phoneme.phoneme}</strong>
+      <span>${phoneme.start.toFixed(2)}s - ${phoneme.end.toFixed(2)}s</span>
+    `;
+    phonemesList.appendChild(item);
   });
 }
 

@@ -276,13 +276,15 @@ button:disabled {
 }
 
 .mistakes-list,
-.words-list {
+.words-list,
+.phonemes-list {
   display: grid;
   gap: 10px;
 }
 
 .mistake-item,
-.word-item {
+.word-item,
+.phoneme-item {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
@@ -295,13 +297,16 @@ button:disabled {
 }
 
 .mistake-item strong,
-.word-item strong {
+.word-item strong,
+.phoneme-item strong {
   display: block;
   margin-bottom: 3px;
 }
 
 .mistake-item p,
-.word-item span {
+.word-item span,
+.word-item p,
+.phoneme-item span {
   color: var(--muted);
   font-size: 14px;
 }
@@ -351,7 +356,8 @@ body.live-mode #promptSelect {
 
   .record-row,
   .mistake-item,
-  .word-item {
+  .word-item,
+  .phoneme-item {
     grid-template-columns: 1fr;
   }
 }

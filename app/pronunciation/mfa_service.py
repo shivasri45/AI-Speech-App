@@ -1,6 +1,5 @@
 import os
 import subprocess
-from textgrid import TextGrid
 
 from app.core.logger import logger
 
@@ -77,6 +76,8 @@ def run_mfa_alignment(
 def parse_textgrid(
     textgrid_path: str
 ):
+
+    from textgrid import TextGrid
 
     logger.info(f"Parsing TextGrid: {textgrid_path}")
 

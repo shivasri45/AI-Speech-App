@@ -24,6 +24,41 @@ class PronunciationMistake(BaseModel):
     feedback: str
 
 
+class PhonemeTiming(BaseModel):
+
+    phoneme: str
+
+    start: float
+
+    end: float
+
+
+class ExpectedWordPhonemes(BaseModel):
+
+    word: str
+
+    phonemes: List[str] = Field(default_factory=list)
+
+
+class WordPronunciationScore(BaseModel):
+
+    word: str
+
+    heard_word: Optional[str] = None
+
+    score: float
+
+    word_match_score: float
+
+    confidence_score: float
+
+    phoneme_score: Optional[float] = None
+
+    expected_phonemes: List[str] = Field(default_factory=list)
+
+    feedback: str
+
+
 class AnalyzeResponse(BaseModel):
 
     transcript: str
@@ -43,3 +78,13 @@ class AnalyzeResponse(BaseModel):
     pace_wpm: float
 
     mistakes: List[PronunciationMistake] = Field(default_factory=list)
+
+    expected_phonemes: List[ExpectedWordPhonemes] = Field(default_factory=list)
+
+    phoneme_timeline: List[PhonemeTiming] = Field(default_factory=list)
+
+    word_scores: List[WordPronunciationScore] = Field(default_factory=list)
+
+    mfa_available: bool = False
+
+    mfa_error: Optional[str] = None
