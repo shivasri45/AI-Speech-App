@@ -208,11 +208,23 @@ async def analyze_audio(
     # --- TEAMMATE 3 INTEGRATION ---
     fluency_service = FluencyService()
     rubric_service = RubricService()
-    
-    # Needs to match the whisper dictionary format approximately
+
+    # Prefer full transcript duration from provider segments, falling back to word timestamps.
+    segment_end_times = [
+        float(segment.get("end", 0.0))
+        for segment in segments
+        if isinstance(segment, dict) and isinstance(segment.get("end"), (int, float))
+    ]
+    word_end_times = [
+        float(word.end)
+        for word in words_output
+        if isinstance(word.end, (int, float))
+    ]
+    total_duration_seconds = max(segment_end_times + word_end_times, default=0.0)
+
     fluency_data = fluency_service.analyze_fluency(
         {"words": [{"word": w.word, "start": w.start, "end": w.end} for w in words_output]},
-        total_duration_seconds=words_output[-1].end if words_output else 0.0
+        total_duration_seconds=total_duration_seconds
     )
     communication_data = rubric_service.evaluate_communication(transcript, expected_text)
 

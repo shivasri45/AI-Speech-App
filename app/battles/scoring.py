@@ -1,5 +1,24 @@
 from typing import Dict, Any
 
+WEIGHTS = {
+    "pronunciation_score": 0.20,
+    "fluency_score": 0.20,
+    "relevance_score": 0.15,
+    "argument_quality": 0.20,
+    "time_discipline": 0.10,
+    "rebuttal_strength": 0.15
+}
+
+
+def _normalize_score(value: Any) -> float:
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+    return max(0.0, min(100.0, numeric_value))
+
+
 def calculate_battle_score(player_data: Dict[str, Any]) -> int:
     """
     Calculates a 1v1 battle score based on pronunciation, fluency, relevance, 
@@ -9,32 +28,21 @@ def calculate_battle_score(player_data: Dict[str, Any]) -> int:
     the only battle score.
     """
     
-    # Extract sub-scores (assuming out of 100 for each)
-    pronunciation = player_data.get("pronunciation_score", 0)
-    fluency = player_data.get("fluency_score", 0)
-    relevance = player_data.get("relevance_score", 0)
-    argument = player_data.get("argument_quality", 0)
-    time_discipline = player_data.get("time_discipline", 0)
-    rebuttal = player_data.get("rebuttal_strength", 0)
-    
-    # Weighted Scoring Formula (Sum of weights = 1.0)
-    weighted_score = (
-        (pronunciation * 0.20) +
-        (fluency * 0.20) +
-        (relevance * 0.15) +
-        (argument * 0.20) +
-        (time_discipline * 0.10) +
-        (rebuttal * 0.15)
-    )
-    
-    return int(weighted_score)
+    if not isinstance(player_data, dict):
+        player_data = {}
+
+    weighted_score = 0.0
+    for score_key, weight in WEIGHTS.items():
+        weighted_score += _normalize_score(player_data.get(score_key, 0)) * weight
+
+    return int(round(weighted_score))
 
 def evaluate_battle_winner(player1_data: Dict[str, Any], player2_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Evaluates the complete state of a 1v1 battle and determines the winner.
     """
-    p1_score = calculate_battle_score(player1_data)
-    p2_score = calculate_battle_score(player2_data)
+    p1_score = calculate_battle_score(player1_data if isinstance(player1_data, dict) else {})
+    p2_score = calculate_battle_score(player2_data if isinstance(player2_data, dict) else {})
     
     winner = "tie"
     if p1_score > p2_score:
