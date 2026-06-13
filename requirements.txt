@@ -16,3 +16,4 @@ torch
 openai-whisper
 textgrid
 cmudict
+google-genai

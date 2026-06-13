@@ -214,7 +214,13 @@ async def analyze_audio(
         {"words": [{"word": w.word, "start": w.start, "end": w.end} for w in words_output]},
         total_duration_seconds=words_output[-1].end if words_output else 0.0
     )
-    communication_data = rubric_service.evaluate_communication(transcript, expected_text)
+    
+    # FIX: Pass parameters explicitly as named keyword arguments
+    communication_data = rubric_service.evaluate_communication(
+        transcript_text=transcript,
+        assignment_type="drill",
+        context_prompt=expected_text
+    )
 
     return AnalyzeResponse(
         transcript=transcript,

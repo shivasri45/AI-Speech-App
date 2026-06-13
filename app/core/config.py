@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from pydantic_settings import BaseSettings
 
 
@@ -19,9 +18,20 @@ class Settings(BaseSettings):
     TEMP_DIR: str = "temp"
     WHISPER_MODEL: str = "base.en"
     MFA_EXECUTABLE: str = "mfa"
+    
+    # 1. Explicitly register the Gemini Key field as optional
+    # This prevents the 'extra_forbidden' validation crash on container start
+    GEMINI_API_KEY: str = ""
 
-    class Config:
-        env_file = ".env"
+    # 2. Pydantic V2 settings configuration format
+    # Using 'ignore' for extra variables ensures that if your team adds other environment 
+    # variables down the road, the container won't crash on startup.
+    model_config = {
+        "env_file": ".env",
+        "extra": "ignore",
+        "case_sensitive": False
+    }
+
 
 settings = Settings()
 
