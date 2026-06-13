@@ -13,7 +13,7 @@ services:
 
     environment:
       WHISPER_MODEL: ${WHISPER_MODEL:-base.en}
-      GEMINI_API_KEY: AIzaSyBMP5iMV8Zuc-6XYwxJPrXPp8UMEL6JFD0
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
 
     depends_on:
       - db
