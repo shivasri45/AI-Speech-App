@@ -1,10 +1,14 @@
 // Public-facing domain types consumed by all components.
 // The wire formats from the backend live entirely inside api.ts.
 
+export type UserRole = "student" | "teacher";
+
 export interface AuthUser {
   email: string;
   displayName: string;
   loggedInAt: string;
+  /** Filled in from `GET /auth/me` after sign-in. Until then: "student". */
+  role: UserRole;
 }
 
 

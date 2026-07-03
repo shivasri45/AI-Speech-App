@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # proxies /interview/analyze to this service. Default points at the
     # local conda env on port 8001.
     CSA_SERVICE_URL: str = "http://127.0.0.1:8001"
+    # Local filesystem path where ss3 stores per-session videos and reports.
+    # We read videos from here directly for the admin panel (ss3 doesn't
+    # expose an HTTP endpoint for video download).
+    CSA_DATA_DIR: str = "ss3/data"
     # How long we'll wait (in seconds) for the ss3 service to finish one
     # video. Each /analyze blocks for the duration so frontend just shows
     # an "analyzing" spinner.
@@ -41,6 +45,11 @@ class Settings(BaseSettings):
     # treats every request as a fake `dev@kiet.edu` user. Pair with
     # `VITE_AUTH_BYPASS=true` on the frontend.
     AUTH_BYPASS: bool = False
+    # Comma-separated emails granted teacher/admin role. Anyone whose
+    # Firebase email matches one of these (case-insensitive) gets access
+    # to the admin panel. Defaults to a single dev/seed entry so the
+    # AUTH_BYPASS path can still see the teacher view.
+    TEACHER_EMAILS: str = "dev@kiet.edu"
     # Inline JSON string of the Firebase service-account credentials. If not
     # set, falls back to `GOOGLE_APPLICATION_CREDENTIALS` (path to a JSON file).
     FIREBASE_SERVICE_ACCOUNT_JSON: str | None = None

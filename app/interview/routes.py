@@ -3,6 +3,9 @@
 `POST /interview/analyze` accepts a video upload, forwards it to the
 ss3 gesture-analysis microservice, and returns a flattened response
 the React `InterviewStudioView` can consume directly.
+
+`POST /interview/submissions` then takes the gesture-analysis result
+and persists a submission record awaiting teacher review.
 """
 
 from __future__ import annotations
@@ -15,11 +18,21 @@ from fastapi import File
 from fastapi import HTTPException
 from fastapi import UploadFile
 from fastapi import status
+from pydantic import BaseModel
+from pydantic import Field
 
 from app.auth import User
 from app.auth import require_user
+from app.storage import submissions as submissions_store
+
+from app.storage import reviews_store
+from app.storage import submissions_store
 
 from .schemas import InterviewAnalysisResponse
+from .schemas import MySubmissionDetail
+from .schemas import MySubmissionsResponse
+from .schemas import InterviewSubmitRequest
+from .schemas import InterviewSubmitResponse
 from .service import CSAServiceError
 from .service import analyze_video
 
@@ -30,6 +43,24 @@ router = APIRouter(prefix="/interview", tags=["interview"])
 
 
 _MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB — webm @ 720p easily fits
+
+
+class SubmitForReviewRequest(BaseModel):
+    """Payload from the student after they've seen their gesture scores
+    and want a teacher to grade the content too."""
+
+    question_id: str
+    question_prompt: str
+    question_category: str = "general"
+    gesture_session_id: str | None = None
+    gesture_score: int = 0
+    gesture_metrics: list[dict] = Field(default_factory=list)
+    duration_seconds: float = 0.0
+
+
+class SubmitForReviewResponse(BaseModel):
+    submission_id: str
+    status: str
 
 
 @router.post("/analyze", response_model=InterviewAnalysisResponse)
@@ -74,3 +105,107 @@ async def analyze(
         )
 
     return result
+
+
+@router.post("/submissions", response_model=InterviewSubmitResponse)
+async def submit_for_review(
+    body: InterviewSubmitRequest,
+    current_user: User = Depends(require_user),
+) -> InterviewSubmitResponse:
+    """Persist a completed interview attempt for teacher review.
+
+    The frontend calls this after `/interview/analyze` finishes — passing
+    the gesture session id + scores so the submission can be reviewed
+    later without re-running the analysis.
+    """
+    submission = submissions_store.create(
+        student_email=current_user.email,
+        student_uid=current_user.uid,
+        student_name=current_user.name,
+        question_id=body.question_id,
+        question_prompt=body.question_prompt,
+        question_category=body.question_category,
+        gesture_session_id=body.gesture_session_id,
+        gesture_score=body.gesture_score,
+        gesture_metrics=[m.model_dump() for m in body.gesture_metrics],
+        duration_seconds=body.duration_seconds,
+    )
+    logger.info(
+        "interview_submission user=%s submission=%s",
+        current_user.email,
+        submission.submission_id,
+    )
+    return InterviewSubmitResponse(submission_id=submission.submission_id)
+
+
+@router.get("/my-submissions", response_model=MySubmissionsResponse)
+async def my_submissions(
+    current_user: User = Depends(require_user),
+) -> MySubmissionsResponse:
+    """Every submission the current student has made, newest first.
+
+    Used by Interview Studio's "My Submissions" panel so a student can
+    check whether their pending submission has been reviewed yet.
+    """
+    subs = submissions_store.list_for_student(current_user.email)
+    subs.sort(key=lambda s: s.submitted_at, reverse=True)
+    return MySubmissionsResponse(submissions=subs, total=len(subs))
+
+
+@router.get("/my-submissions/{submission_id}", response_model=MySubmissionDetail)
+async def my_submission_detail(
+    submission_id: str,
+    current_user: User = Depends(require_user),
+) -> MySubmissionDetail:
+    """Full detail for one of the current student's submissions.
+
+    Includes the teacher review (rubric + comment + combined score) once
+    a teacher has posted it. Returns 403 if the submission belongs to
+    someone else — students can only see their own work.
+    """
+    submission = submissions_store.get(submission_id)
+    if submission is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="submission_not_found",
+        )
+    if submission.student_email.lower() != current_user.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="not_your_submission",
+        )
+    review = reviews_store.get_for_submission(submission_id)
+    return MySubmissionDetail(submission=submission, review=review)
+
+
+@router.post("/submissions", response_model=SubmitForReviewResponse)
+async def submit_for_review(
+    body: SubmitForReviewRequest,
+    current_user: User = Depends(require_user),
+) -> SubmitForReviewResponse:
+    """Persist the student's interview attempt for teacher review.
+
+    Called from the frontend after the AI gesture-analysis stage. The
+    teacher's queue (`/admin/submissions/pending`) picks it up next.
+    """
+    submission = submissions_store.create(
+        student_email=current_user.email,
+        student_uid=current_user.uid,
+        student_name=current_user.name or "",
+        question_id=body.question_id,
+        question_prompt=body.question_prompt,
+        question_category=body.question_category,
+        gesture_session_id=body.gesture_session_id,
+        gesture_score=int(body.gesture_score or 0),
+        gesture_metrics=body.gesture_metrics,
+        duration_seconds=float(body.duration_seconds or 0.0),
+    )
+    logger.info(
+        "interview_submission created id=%s student=%s",
+        submission.submission_id,
+        current_user.email,
+    )
+    return SubmitForReviewResponse(
+        submission_id=submission.submission_id,
+        status=submission.status,
+    )

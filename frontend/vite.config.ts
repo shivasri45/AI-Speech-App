@@ -25,10 +25,16 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      "/debate": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        ws: true,
+      },
       "/analyze": "http://localhost:8080",
       "/attempts": "http://localhost:8080",
       "/interview": "http://localhost:8080",
       "/auth": "http://localhost:8080",
+      "/admin": "http://localhost:8080",
     },
   },
 });

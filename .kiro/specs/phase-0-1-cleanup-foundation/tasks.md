@@ -90,7 +90,7 @@ Implementation language: **Python 3.11+** (already in use across the codebase). 
     - **Property 19: Persistence failure does not break analysis**
     - **Validates: Requirements 9.7**
 
-- [ ] 5. Stage A — Frontend update to sectioned shape
+- [x] 5. Stage A — Frontend update to sectioned shape
   - [x] 5.1 Update `app/frontend/app.js` `renderResult` to read sectioned fields
     - `pronunciationScore` ← `pronunciation.available ? pronunciation.overall_score : null`.
     - `clarityScore` ← `fluency.clarity_score`.
@@ -112,21 +112,21 @@ Implementation language: **Python 3.11+** (already in use across the codebase). 
     - Run the server (`uvicorn app.main:app --reload`), open `/ui/`, record a 2-second clip with the default prompt, click Analyze, and verify: pronunciation score renders (or shows `--` when provider is unavailable), Expected/Heard phonemes appear in the Transcript Words panel, Transcript Mismatch panel renders when expected text is set, and the Recent Attempts list refreshes after the analysis completes.
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 6. Checkpoint — Stage A integration
+- [x] 6. Checkpoint — Stage A integration
   - Ensure all tests pass (`pytest`). Run the manual frontend check from 5.4. Ask the user if any UI behavior looks off before proceeding to Stage B.
 
-- [ ] 7. Stage B — Slim the response schema
-  - [ ] 7.1 Rewrite `AnalyzeResponse` in `app/schemas/pronunciation_schema.py`
+- [x] 7. Stage B — Slim the response schema
+  - [x] 7.1 Rewrite `AnalyzeResponse` in `app/schemas/pronunciation_schema.py`
     - Replace the existing `AnalyzeResponse` with one that exposes exactly: `analysis_id: str`, `audio: AudioAsset`, `transcription: TranscriptionResult`, `pronunciation: PronunciationResult`, `fluency: FluencyResult`, `communication: dict`, `debug: dict`.
     - Import `FluencyResult` from `app.fluency.schemas`.
     - Remove the legacy classes: `WordTimestamp`, `WordPronunciationScore`, `PhonemeTiming`, `ExpectedWordPhonemes`, `PronunciationMistake`.
     - _Requirements: 1.1, 1.3_
 
-  - [ ] 7.2 Update `analyze_audio` to stop emitting legacy fields
+  - [x] 7.2 Update `analyze_audio` to stop emitting legacy fields
     - Remove the legacy-field arguments from the `AnalyzeResponse(...)` constructor call. Remove the `build_word_timestamps`, `build_transcript_match` (as a top-level helper — `build_debug_section` replaces it), and `build_legacy_word_scores` helpers from `analysis_routes.py`.
     - _Requirements: 1.1_
 
-  - [ ] 7.3 Update `app/attempts/schemas.py::build_attempt_summary` to read sectioned-only
+  - [x] 7.3 Update `app/attempts/schemas.py::build_attempt_summary` to read sectioned-only
     - Source `expected_text` from `response_data["debug"]["expected_text"]`.
     - Source `transcript` from `response_data["transcription"]["text"]` with fallback to `["normalized_text"]`.
     - Source `language` from `response_data["transcription"]["language"]`.

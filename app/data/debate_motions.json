@@ -1,0 +1,42 @@
+[
+  {
+    "id": "school-uniforms",
+    "title": "School uniforms",
+    "text": "This house believes school uniforms should be mandatory in all schools."
+  },
+  {
+    "id": "homework-ban",
+    "title": "Ban homework",
+    "text": "This house believes homework should be banned for students under sixteen."
+  },
+  {
+    "id": "social-media-age-limit",
+    "title": "Social media age limit",
+    "text": "This house believes social media platforms should be restricted to users aged sixteen and above."
+  },
+  {
+    "id": "standardized-testing",
+    "title": "End standardized testing",
+    "text": "This house believes standardized testing should be abolished in schools."
+  },
+  {
+    "id": "four-day-school-week",
+    "title": "Four-day school week",
+    "text": "This house believes schools should adopt a four-day school week."
+  },
+  {
+    "id": "phones-in-class",
+    "title": "Mobile phones in class",
+    "text": "This house believes mobile phones should be banned in classrooms."
+  },
+  {
+    "id": "mandatory-second-language",
+    "title": "Mandatory second language",
+    "text": "This house believes learning a second language should be mandatory in every school."
+  },
+  {
+    "id": "plant-based-cafeteria",
+    "title": "Plant-based cafeteria",
+    "text": "This house believes school cafeterias should serve only plant-based meals."
+  }
+]

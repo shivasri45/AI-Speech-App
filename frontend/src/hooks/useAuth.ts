@@ -99,7 +99,29 @@ function firebaseUserToAuthUser(fbUser: FirebaseUser): AuthUser {
     email,
     displayName: name,
     loggedInAt: new Date().toISOString(),
+    role: "student",
   };
+}
+
+interface AuthMeResponse {
+  uid: string;
+  email: string;
+  name: string | null;
+  email_verified: boolean;
+  role: "student" | "teacher";
+}
+
+async function fetchRole(token: string | null): Promise<"student" | "teacher"> {
+  try {
+    const response = await fetch("/auth/me", {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) return "student";
+    const data = (await response.json()) as AuthMeResponse;
+    return data.role === "teacher" ? "teacher" : "student";
+  } catch {
+    return "student";
+  }
 }
 
 export function useAuth(): UseAuth {
@@ -143,8 +165,12 @@ export function useAuth(): UseAuth {
       } catch {
         tokenRef.current = null;
       }
-      setUser(firebaseUserToAuthUser(fbUser));
+      const baseUser = firebaseUserToAuthUser(fbUser);
+      setUser(baseUser);
       setLoading(false);
+      // Resolve role server-side (uses TEACHER_EMAILS allowlist).
+      const role = await fetchRole(tokenRef.current);
+      setUser((prev) => (prev ? { ...prev, role } : prev));
     });
     return unsubscribe;
   }, []);
@@ -185,9 +211,14 @@ export function useAuth(): UseAuth {
         email,
         displayName: deriveDisplayName(email),
         loggedInAt: new Date().toISOString(),
+        role: "student",
       };
       window.localStorage.setItem(BYPASS_STORAGE_KEY, JSON.stringify(next));
       setUser(next);
+      // Backend will tell us if this email is in TEACHER_EMAILS.
+      void fetchRole("dev-bypass-token").then((role) => {
+        setUser((prev) => (prev ? { ...prev, role } : prev));
+      });
       return { ok: true };
     },
     [],

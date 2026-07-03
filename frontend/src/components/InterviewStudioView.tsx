@@ -24,7 +24,15 @@ import {
   UserCheck,
   Video,
 } from "lucide-react";
-import { analyzeInterview, type InterviewGestureMetric } from "../api";
+import {
+  analyzeInterview,
+  fetchMySubmission,
+  fetchMySubmissions,
+  submitInterviewForReview,
+  type InterviewGestureMetric,
+  type StudentSubmissionSummary,
+} from "../api";
+import { relativeTime } from "../utils/time";
 
 interface InterviewStudioViewProps {
   onBack: () => void;
@@ -138,41 +146,31 @@ const CATEGORY_LABEL: Record<InterviewQuestion["category"], string> = {
   situational: "Situational",
 };
 
-function rand(min: number, max: number): number {
-  return Math.round(min + Math.random() * (max - min));
-}
 
-function pickTeacherRubric(): TeacherRubricItem[] {
-  return [
-    {
-      key: "structure",
-      label: "Structure & STAR",
-      score: rand(6, 9),
-      out_of: 10,
-      comment: "Clear opening claim. The result step was light — quantify your impact next time.",
-    },
-    {
-      key: "clarity",
-      label: "Clarity of Thought",
-      score: rand(6, 9),
-      out_of: 10,
-      comment: "Ideas flow well, minimal filler. Avoid back-tracking mid-sentence.",
-    },
-    {
-      key: "evidence",
-      label: "Evidence & Specifics",
-      score: rand(5, 9),
-      out_of: 10,
-      comment: "Add one concrete example with a metric — that lands much harder.",
-    },
-    {
-      key: "presence",
-      label: "Presence",
-      score: rand(6, 9),
-      out_of: 10,
-      comment: "Confident tone. Slow down slightly when delivering the resolution.",
-    },
-  ];
+
+// Rubric labels + comment fallback for when we render a real teacher review.
+const RUBRIC_META: Array<{
+  key: "structure" | "clarity" | "evidence" | "presence";
+  label: string;
+}> = [
+  { key: "structure", label: "Structure & STAR" },
+  { key: "clarity", label: "Clarity of Thought" },
+  { key: "evidence", label: "Evidence & Specifics" },
+  { key: "presence", label: "Presence" },
+];
+
+function reviewToRubricItems(
+  rubric: { structure: number; clarity: number; evidence: number; presence: number },
+  comment: string,
+): TeacherRubricItem[] {
+  return RUBRIC_META.map((meta) => ({
+    key: meta.key,
+    label: meta.label,
+    score: rubric[meta.key],
+    out_of: 10,
+    // Only the first item shows the free-form comment so the UI stays clean.
+    comment: meta.key === "structure" && comment ? comment : "",
+  }));
 }
 
 function classifyScore(value: number): {
@@ -226,6 +224,135 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [gestureScores, setGestureScores] = useState<GestureScore[]>([]);
   const [teacherRubric, setTeacherRubric] = useState<TeacherRubricItem[]>([]);
+  const [teacherComment, setTeacherComment] = useState<string>("");
+  const [pollAttempts, setPollAttempts] = useState<number>(0);
+
+  // Bookkeeping for the review poll — we ping /interview/my-submissions/{id}
+  // every 5 seconds until the teacher posts a review, then transition to
+  // the completed stage with real rubric data.
+  const submissionIdRef = useRef<string | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
+
+  // "Your submissions" panel on the pick screen: student can jump back into
+  // a pending submission (resume polling) or open a reviewed one (see the
+  // real combined score + teacher rubric).
+  const [mySubmissions, setMySubmissions] = useState<StudentSubmissionSummary[]>([]);
+  const [mySubmissionsLoading, setMySubmissionsLoading] = useState(false);
+  const [mySubmissionsError, setMySubmissionsError] = useState<string | null>(null);
+
+  const stopReviewPolling = useCallback(() => {
+    if (pollTimerRef.current !== null) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const applyReviewIfPresent = useCallback(async (submissionId: string): Promise<boolean> => {
+    try {
+      const detail = await fetchMySubmission(submissionId);
+      if (detail.review) {
+        setTeacherRubric(reviewToRubricItems(detail.review.rubric, detail.review.comment));
+        setTeacherComment(detail.review.comment);
+        setStage("complete");
+        stopReviewPolling();
+        return true;
+      }
+    } catch (err) {
+      // Networking hiccups shouldn't kill the poll — surface via error log
+      // and try again on the next tick.
+      console.warn("review poll failed", err);
+    }
+    return false;
+  }, [stopReviewPolling]);
+
+  const startReviewPolling = useCallback(
+    (submissionId: string) => {
+      stopReviewPolling();
+      setPollAttempts(0);
+
+      // Kick off an immediate check so the "reviewed while UI was closed"
+      // case resolves instantly instead of waiting the first 5 seconds.
+      void applyReviewIfPresent(submissionId);
+
+      pollTimerRef.current = window.setInterval(() => {
+        setPollAttempts((n) => n + 1);
+        void applyReviewIfPresent(submissionId);
+      }, 5000);
+    },
+    [applyReviewIfPresent, stopReviewPolling],
+  );
+
+  // Stop polling if the component unmounts (user navigates away etc).
+  useEffect(() => {
+    return () => stopReviewPolling();
+  }, [stopReviewPolling]);
+
+  // Refresh the student's submissions list whenever they return to the pick
+  // stage. Runs on mount and every time the user hits "Restart"/back-to-menu
+  // and re-enters the studio.
+  const refreshMySubmissions = useCallback(async () => {
+    setMySubmissionsLoading(true);
+    setMySubmissionsError(null);
+    try {
+      const items = await fetchMySubmissions();
+      setMySubmissions(items);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not load your submissions.";
+      setMySubmissionsError(message);
+    } finally {
+      setMySubmissionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (stage === "pick") {
+      void refreshMySubmissions();
+    }
+  }, [stage, refreshMySubmissions]);
+
+  // Jump into an existing submission from the "Your submissions" panel.
+  // Reviewed → transitions to complete with the real rubric.
+  // Pending → transitions to submitted and resumes polling.
+  const openMySubmission = useCallback(
+    async (submissionId: string) => {
+      submissionIdRef.current = submissionId;
+      try {
+        const detail = await fetchMySubmission(submissionId);
+        // Rebuild the per-metric card list so the complete/submitted screens
+        // render the same body-language breakdown the student saw at analyze
+        // time, without re-running the video through ss3.
+        setGestureScores(gestureScoresFromMetrics(detail.gestureMetrics));
+        elapsedAtAnalyzeRef.current = Math.round(detail.durationSeconds);
+        gestureSessionIdRef.current = null; // video already stored in ss3 by session id
+
+        if (detail.review) {
+          setTeacherRubric(
+            reviewToRubricItems(detail.review.rubric, detail.review.comment),
+          );
+          setTeacherComment(detail.review.comment);
+          setStage("complete");
+          stopReviewPolling();
+        } else {
+          setTeacherRubric([]);
+          setTeacherComment("");
+          setStage("submitted");
+          startReviewPolling(submissionId);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not open submission.";
+        setMySubmissionsError(message);
+      }
+    },
+    [startReviewPolling, stopReviewPolling],
+  );
+
+  // Captured from the real /interview/analyze response so the later
+  // submit-for-review call can reference the gesture session by id.
+  const gestureSessionIdRef = useRef<string | null>(null);
+  const elapsedAtAnalyzeRef = useRef<number>(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const question = QUESTIONS[questionIdx] ?? QUESTIONS[0]!;
 
@@ -381,6 +508,11 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
 
     try {
       const result = await analyzeInterview(blob);
+      gestureSessionIdRef.current = result.sessionId ?? null;
+      elapsedAtAnalyzeRef.current = Math.max(
+        0,
+        Math.round(result.durationSeconds),
+      );
       setGestureScores(gestureScoresFromMetrics(result.metrics));
       setAnalyzeProgress(100);
     } catch (err) {
@@ -392,14 +524,42 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
     }
   }, [stream, stopRecording]);
 
-  const submitForReview = useCallback(() => {
+  const submitForReview = useCallback(async () => {
+    setSubmitError(null);
     setStage("submitted");
-    // After a short delay, "teacher" reviews and posts scores.
-    window.setTimeout(() => {
-      setTeacherRubric(pickTeacherRubric());
-      setStage("complete");
-    }, 2200);
-  }, []);
+    try {
+      const gestureAvg =
+        gestureScores.length === 0
+          ? 0
+          : Math.round(
+              gestureScores.reduce((sum, g) => sum + g.value, 0) /
+                gestureScores.length,
+            );
+      const { submissionId } = await submitInterviewForReview({
+        sessionId: gestureSessionIdRef.current ?? "",
+        questionId: question.id,
+        questionPrompt: question.prompt,
+        questionCategory: question.category,
+        gestureScore: gestureAvg,
+        metrics: gestureScores.map((g) => ({
+          name: g.key,
+          score: g.value,
+          flag: g.flag,
+        })),
+        durationSeconds: elapsedAtAnalyzeRef.current,
+      });
+      submissionIdRef.current = submissionId;
+      // Start polling the backend every few seconds. When a teacher reviews
+      // the submission via the admin panel, the poll will pick it up and
+      // transition to the completed screen with real scores.
+      startReviewPolling(submissionId);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not submit for review.";
+      setSubmitError(message);
+      setStage("analyze");
+    }
+  }, [gestureScores, question]);
 
   const handleRestart = useCallback(() => {
     setStage("pick");
@@ -410,8 +570,15 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
     setTeacherRubric([]);
     setAnalyzeProgress(0);
     setAnalyzeError(null);
+    setSubmitError(null);
+    setTeacherComment("");
+    setPollAttempts(0);
+    gestureSessionIdRef.current = null;
+    submissionIdRef.current = null;
+    elapsedAtAnalyzeRef.current = 0;
     recordedBlobRef.current = null;
     chunksRef.current = [];
+    stopReviewPolling();
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       try {
         recorderRef.current.stop();
@@ -490,6 +657,83 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
           <Stepper stage={stage} />
         </div>
       </header>
+
+      {stage === "pick" && mySubmissions.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-400">
+              Your submissions
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshMySubmissions()}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition"
+              aria-label="Refresh submissions list"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${mySubmissionsLoading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {mySubmissions.map((sub, idx) => {
+              const isReviewed = sub.status === "reviewed";
+              const primaryScore =
+                isReviewed && sub.combinedScore != null
+                  ? sub.combinedScore
+                  : sub.gestureScore;
+              const primaryLabel = isReviewed ? "Combined" : "Gesture";
+              return (
+                <button
+                  key={sub.submissionId}
+                  type="button"
+                  onClick={() => void openMySubmission(sub.submissionId)}
+                  style={{ animationDelay: `${idx * 60}ms` }}
+                  className="card-glass text-left p-4 md:p-5 hover:-translate-y-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 animate-fade-in-up"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {isReviewed ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-full px-2 py-0.5">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Reviewed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full px-2 py-0.5">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Pending
+                          </span>
+                        )}
+                        <span className="text-[10px] uppercase tracking-widest text-zinc-500">
+                          {relativeTime(sub.submittedAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-zinc-100 line-clamp-2 leading-snug">
+                        {sub.questionPrompt}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div
+                        className={`text-2xl font-bold tabular-nums ${classifyScore(primaryScore).textClass}`}
+                      >
+                        {primaryScore}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+                        {primaryLabel}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {mySubmissionsError && (
+            <p className="text-xs text-rose-300">{mySubmissionsError}</p>
+          )}
+        </section>
+      )}
 
       {stage === "pick" && (
         <section className="space-y-4">
@@ -706,9 +950,16 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
                   );
                 })}
               </div>
+              {submitError && (
+                <div className="mx-auto max-w-md card-glass border-rose-500/40 px-4 py-3 text-sm text-rose-300 text-left">
+                  {submitError}
+                </div>
+              )}
               <button
                 type="button"
-                onClick={submitForReview}
+                onClick={() => {
+                  void submitForReview();
+                }}
                 className="btn-primary inline-flex items-center gap-2 px-5 py-2.5"
               >
                 <Send className="w-4 h-4" />
@@ -720,7 +971,7 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
       )}
 
       {stage === "submitted" && (
-        <section className="card-glass p-8 md:p-12 text-center space-y-3">
+        <section className="card-glass p-8 md:p-12 text-center space-y-4">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-glow-sm mx-auto">
             <UserCheck className="w-7 h-7 text-white" />
           </div>
@@ -728,12 +979,54 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
             Awaiting teacher review
           </h2>
           <p className="text-sm text-zinc-500 max-w-md mx-auto">
-            Your answer is in the queue. Teachers usually post a rubric score
-            within a day. The preview demo simulates a near-instant response.
+            Your submission is in the queue. When a teacher scores it in the
+            admin panel, this screen updates automatically with your combined
+            score.
           </p>
+          {submissionIdRef.current && (
+            <p className="text-[11px] uppercase tracking-widest text-zinc-600">
+              Submission&nbsp;
+              <span className="text-zinc-400 font-mono">
+                {submissionIdRef.current.slice(0, 8)}
+              </span>
+            </p>
+          )}
           <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-zinc-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Scoring…
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Checking every 5s{" "}
+            <span className="text-zinc-600 normal-case tracking-normal">
+              ({pollAttempts} attempts)
+            </span>
           </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (submissionIdRef.current) {
+                  setPollAttempts((n) => n + 1);
+                  void applyReviewIfPresent(submissionIdRef.current);
+                }
+              }}
+              className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Check now
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                stopReviewPolling();
+                onBack();
+              }}
+              className="btn-ghost inline-flex items-center gap-2 px-4 py-2 text-sm"
+            >
+              Come back later
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-600 max-w-md mx-auto">
+            The AI gesture score is already saved. The final combined score
+            appears once a teacher posts their rubric.
+          </p>
         </section>
       )}
 
@@ -837,6 +1130,14 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
                 <UserCheck className="w-3.5 h-3.5" />
                 <span>Teacher rubric · {teacherAverage}/100</span>
               </div>
+              {teacherComment && (
+                <div className="mb-4 rounded-xl bg-brand-500/5 border border-brand-500/20 px-3 py-2.5 text-sm text-zinc-300 leading-relaxed">
+                  <div className="text-[10px] uppercase tracking-widest text-brand-300 mb-1">
+                    Teacher note
+                  </div>
+                  {teacherComment}
+                </div>
+              )}
               <div className="space-y-3">
                 {teacherRubric.map((item) => (
                   <div
@@ -849,21 +1150,23 @@ export function InterviewStudioView({ onBack }: InterviewStudioViewProps) {
                         {item.score}/{item.out_of}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-                      {item.comment}
-                    </p>
+                    {item.comment && (
+                      <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
+                        {item.comment}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="card-glass border-amber-500/40 px-4 py-3 flex items-start gap-3 text-sm text-amber-200">
-            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" />
+          <div className="card-glass border-emerald-500/40 px-4 py-3 flex items-start gap-3 text-sm text-emerald-200">
+            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-300" />
             <span>
-              Preview mode: AI scores and teacher feedback are simulated. Once
-              the gesture analysis backend and the teacher review pipeline land,
-              this same screen renders the real combined score.
+              Real scores: the AI body-language analysis comes from the
+              MediaPipe pipeline and the rubric was posted by a teacher via
+              the admin panel.
             </span>
           </div>
         </section>

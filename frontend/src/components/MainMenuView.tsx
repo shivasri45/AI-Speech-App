@@ -3,6 +3,8 @@ import {
   ArrowRight,
   Briefcase,
   Gauge,
+  LayoutDashboard,
+  MessageSquareText,
   Mic,
   Sparkles,
   Swords,
@@ -11,10 +13,14 @@ import type { AuthUser } from "../types";
 
 interface MainMenuViewProps {
   user: AuthUser;
+  /** When true, the teacher-only Admin Panel tile is rendered. */
+  showAdmin?: boolean;
   onSelectPronunciation: () => void;
   onSelectBattle: () => void;
   onSelectInterview: () => void;
   onSelectFourth: () => void;
+  onSelectDebate: () => void;
+  onSelectAdmin?: () => void;
 }
 
 type FeatureStatus = "live" | "coming-soon";
@@ -36,13 +42,17 @@ interface Feature {
 
 export function MainMenuView({
   user,
+  showAdmin = false,
   onSelectPronunciation,
   onSelectBattle,
   onSelectInterview,
   onSelectFourth,
+  onSelectDebate,
+  onSelectAdmin,
 }: MainMenuViewProps) {
   const features: Feature[] = useMemo(
-    () => [
+    () => {
+      const base: Feature[] = [
       {
         id: "pronunciation",
         title: "Pronunciation Drill",
@@ -107,8 +117,54 @@ export function MainMenuView({
         onClick: onSelectFourth,
         ariaLabel: "Open voice cruise control",
       },
+      {
+        id: "debate",
+        title: "Group Debate",
+        tagline: "Phase 4 · Live",
+        description:
+          "Join 4-6 classmates. Ek motion, ek turn each. AI scores, teacher can override.",
+        icon: MessageSquareText,
+        status: "live",
+        accent: "text-violet-300",
+        gradient: "from-violet-600/20 via-fuchsia-500/10 to-transparent",
+        ringGlow: "hover:shadow-[0_0_28px_-4px_rgba(139,92,246,0.45)]",
+        iconGlow:
+          "bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_18px_-4px_rgba(139,92,246,0.55)]",
+        onClick: onSelectDebate,
+        ariaLabel: "Open group debate",
+      },
+    ];
+
+      if (showAdmin && onSelectAdmin) {
+        base.push({
+          id: "admin",
+          title: "Admin Panel",
+          tagline: "Teacher · Live",
+          description:
+            "Review pending submissions, see class analytics, leaderboard.",
+          icon: LayoutDashboard,
+          status: "live",
+          accent: "text-cyan-300",
+          gradient: "from-cyan-500/20 via-brand-500/15 to-transparent",
+          ringGlow: "hover:shadow-[0_0_28px_-4px_rgba(34,211,238,0.45)]",
+          iconGlow:
+            "bg-gradient-to-br from-cyan-500 to-brand-500 shadow-[0_0_18px_-4px_rgba(34,211,238,0.55)]",
+          onClick: onSelectAdmin,
+          ariaLabel: "Open admin panel",
+        });
+      }
+
+      return base;
+    },
+    [
+      onSelectPronunciation,
+      onSelectBattle,
+      onSelectInterview,
+      onSelectFourth,
+      onSelectDebate,
+      onSelectAdmin,
+      showAdmin,
     ],
-    [onSelectPronunciation, onSelectBattle, onSelectInterview, onSelectFourth],
   );
 
   return (

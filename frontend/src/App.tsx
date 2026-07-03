@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdminPanelView } from "./components/AdminPanelView";
+import { AdminReviewView } from "./components/admin/AdminReviewView";
+import { AdminStudentDetailView } from "./components/admin/AdminStudentDetailView";
 import { BackgroundOrbs } from "./components/BackgroundOrbs";
 import { BattleLobbyView } from "./components/BattleLobbyView";
 import { BattleResultView } from "./components/BattleResultView";
 import { BattleRoomView } from "./components/BattleRoomView";
+import { DebateArenaView } from "./components/DebateArenaView";
 import { Header } from "./components/Header";
 import { HomeView } from "./components/HomeView";
 import { InterviewStudioView } from "./components/InterviewStudioView";
@@ -33,7 +37,11 @@ type View =
   | "battle-room"
   | "battle-result"
   | "interview"
-  | "cruise";
+  | "cruise"
+  | "debate-arena"
+  | "admin-panel"
+  | "admin-review"
+  | "admin-student";
 
 interface BattleSession {
   roomCode: string;
@@ -98,6 +106,12 @@ export default function App() {
   >(() => new Map());
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [battleSession, setBattleSession] = useState<BattleSession | null>(null);
+  const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(
+    null,
+  );
+  const [activeStudentEmail, setActiveStudentEmail] = useState<string | null>(
+    null,
+  );
 
   // Initial data loads — only once we're authenticated.
   useEffect(() => {
@@ -179,6 +193,30 @@ export default function App() {
 
   const handleSelectFourth = useCallback(() => {
     setView("cruise");
+  }, []);
+
+  const handleSelectDebate = useCallback(() => {
+    setView("debate-arena");
+  }, []);
+
+  const handleSelectAdmin = useCallback(() => {
+    setActiveSubmissionId(null);
+    setActiveStudentEmail(null);
+    setView("admin-panel");
+  }, []);
+
+  const handleOpenReview = useCallback((submissionId: string) => {
+    setActiveSubmissionId(submissionId);
+    setView("admin-review");
+  }, []);
+
+  const handleOpenStudent = useCallback((email: string) => {
+    setActiveStudentEmail(email);
+    setView("admin-student");
+  }, []);
+
+  const handleBackToAdminPanel = useCallback(() => {
+    setView("admin-panel");
   }, []);
 
   const handleStart = useCallback(() => {
@@ -387,10 +425,13 @@ export default function App() {
         {view === "main-menu" && (
           <MainMenuView
             user={user}
+            showAdmin={user.role === "teacher"}
             onSelectPronunciation={handleSelectPronunciation}
             onSelectBattle={handleSelectBattle}
             onSelectInterview={handleSelectInterview}
             onSelectFourth={handleSelectFourth}
+            onSelectDebate={handleSelectDebate}
+            onSelectAdmin={handleSelectAdmin}
           />
         )}
 
@@ -465,6 +506,33 @@ export default function App() {
         )}
 
         {view === "cruise" && <SpeedometerView onBack={handleBackToMenu} />}
+
+        {view === "debate-arena" && (
+          <DebateArenaView onBack={handleBackToMenu} />
+        )}
+
+        {view === "admin-panel" && (
+          <AdminPanelView
+            onBack={handleBackToMenu}
+            onOpenReview={handleOpenReview}
+            onOpenStudent={handleOpenStudent}
+          />
+        )}
+
+        {view === "admin-review" && activeSubmissionId && (
+          <AdminReviewView
+            submissionId={activeSubmissionId}
+            onBack={handleBackToAdminPanel}
+            onReviewed={handleBackToAdminPanel}
+          />
+        )}
+
+        {view === "admin-student" && activeStudentEmail && (
+          <AdminStudentDetailView
+            email={activeStudentEmail}
+            onBack={handleBackToAdminPanel}
+          />
+        )}
       </main>
 
       <footer className="w-full max-w-5xl mx-auto px-4 md:px-6 pb-8 pt-2 text-center text-xs text-zinc-600">

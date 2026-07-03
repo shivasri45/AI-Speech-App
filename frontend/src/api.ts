@@ -221,6 +221,143 @@ export interface InterviewGestureMetric {
   flag: string;
 }
 
+export async function submitInterviewForReview(payload: {
+  sessionId: string;
+  questionId: string;
+  questionPrompt: string;
+  questionCategory: string;
+  gestureScore: number;
+  metrics: InterviewGestureMetric[];
+  durationSeconds: number;
+}): Promise<{ submissionId: string }> {
+  const body = {
+    question_id: payload.questionId,
+    question_prompt: payload.questionPrompt,
+    question_category: payload.questionCategory,
+    gesture_session_id: payload.sessionId,
+    gesture_score: payload.gestureScore,
+    gesture_metrics: payload.metrics.map((m) => ({
+      name: m.name,
+      score: m.score,
+      flag: m.flag,
+    })),
+    duration_seconds: payload.durationSeconds,
+  };
+  const raw = await fetchJson<{ submission_id: string }>(
+    "/interview/submissions",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return { submissionId: raw.submission_id };
+}
+
+// ---- Student-visible submission history + review poll ----
+
+export interface StudentSubmissionSummary {
+  submissionId: string;
+  questionPrompt: string;
+  questionCategory: string;
+  gestureScore: number;
+  teacherScore: number | null;
+  combinedScore: number | null;
+  status: "pending" | "reviewed" | "abandoned";
+  submittedAt: string;
+  reviewedAt: string | null;
+}
+
+export interface StudentSubmissionDetail extends StudentSubmissionSummary {
+  gestureMetrics: InterviewGestureMetric[];
+  durationSeconds: number;
+  review: {
+    rubric: {
+      structure: number;
+      clarity: number;
+      evidence: number;
+      presence: number;
+    };
+    comment: string;
+    teacherScore: number;
+    combinedScore: number;
+    reviewedAt: string;
+  } | null;
+}
+
+interface SubmissionWire {
+  submission_id: string;
+  question_prompt: string;
+  question_category: string;
+  gesture_score: number;
+  gesture_metrics: Array<{ name: string; score: number | null; flag: string }>;
+  teacher_score: number | null;
+  combined_score: number | null;
+  status: "pending" | "reviewed" | "abandoned";
+  submitted_at: string;
+  reviewed_at: string | null;
+  duration_seconds: number;
+}
+
+interface ReviewWire {
+  rubric: { structure: number; clarity: number; evidence: number; presence: number };
+  comment: string;
+  teacher_score: number;
+  combined_score: number;
+  reviewed_at: string;
+}
+
+function toSummary(raw: SubmissionWire): StudentSubmissionSummary {
+  return {
+    submissionId: raw.submission_id,
+    questionPrompt: raw.question_prompt,
+    questionCategory: raw.question_category,
+    gestureScore: Math.round(raw.gesture_score ?? 0),
+    teacherScore:
+      typeof raw.teacher_score === "number" ? raw.teacher_score : null,
+    combinedScore:
+      typeof raw.combined_score === "number" ? raw.combined_score : null,
+    status: raw.status,
+    submittedAt: raw.submitted_at,
+    reviewedAt: raw.reviewed_at,
+  };
+}
+
+export async function fetchMySubmissions(): Promise<StudentSubmissionSummary[]> {
+  const data = await fetchJson<{ submissions: SubmissionWire[] }>(
+    "/interview/my-submissions",
+  );
+  return (data.submissions ?? []).map(toSummary);
+}
+
+export async function fetchMySubmission(
+  submissionId: string,
+): Promise<StudentSubmissionDetail> {
+  const data = await fetchJson<{ submission: SubmissionWire; review: ReviewWire | null }>(
+    `/interview/my-submissions/${encodeURIComponent(submissionId)}`,
+  );
+  const summary = toSummary(data.submission);
+  return {
+    ...summary,
+    gestureMetrics: (data.submission.gesture_metrics ?? []).map((m) => ({
+      name: m.name,
+      score: typeof m.score === "number" ? m.score : null,
+      flag: m.flag || "ok",
+    })),
+    durationSeconds: Number(data.submission.duration_seconds ?? 0),
+    review: data.review
+      ? {
+          rubric: data.review.rubric,
+          comment: data.review.comment,
+          teacherScore: data.review.teacher_score,
+          combinedScore: data.review.combined_score,
+          reviewedAt: data.review.reviewed_at,
+        }
+      : null,
+  };
+}
+
+
 export interface InterviewAnalysisResult {
   sessionId: string;
   gestureScore: number;

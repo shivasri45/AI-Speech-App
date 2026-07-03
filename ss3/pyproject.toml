@@ -16,9 +16,10 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "python-multipart>=0.0.9",
     "opencv-python>=4.9",
-    # Pin to 0.10.x which ships the legacy ``mp.solutions`` API used by our
-    # analyzers. Newer 0.11+ wheels (especially on Py 3.13) dropped it.
-    "mediapipe>=0.10.11,<0.11",
+    # Pin to <=0.10.14 which ships the legacy ``mp.solutions`` API used by
+    # our analyzers. Google removed `mediapipe.solutions` in 0.10.15+ in
+    # favour of the new `mediapipe.tasks` API.
+    "mediapipe>=0.10.11,<=0.10.14",
     "numpy>=1.26,<2.0",
     "pydantic>=2.6",
     "PyYAML>=6.0",
