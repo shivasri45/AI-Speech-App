@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1.6
+# -----------------------------------------------------------------------------
+# Combined image for Fly.io deployment: main backend (port 8080, public)
+# co-located with the ss3 gesture microservice (port 8001, loopback-only).
+#
+# Local dev still uses the plain `Dockerfile` + `docker-compose.yml`. This
+# file is only for `fly deploy`.
+# -----------------------------------------------------------------------------
+
+# Stage 1: build the React frontend once, hand off /dist to the runtime stage.
+FROM node:20-alpine AS frontend-build
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Python runtime with BOTH backends installed side-by-side.
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HF_HOME=/data/cache/huggingface \
+    XDG_CACHE_HOME=/data/cache
+
+# System deps for audio (ffmpeg, libsndfile) + video (libgl, libglib for
+# opencv + mediapipe) + native pip build tools (gcc/g++).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libsndfile1 \
+        libgl1 \
+        libglib2.0-0 \
+        gcc \
+        g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Main backend Python deps first for a cached layer.
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# ss3 microservice deps. mediapipe pinned to <=0.10.14 which still ships the
+# legacy `mp.solutions` API our analyzers depend on.
+RUN pip install \
+        "opencv-python>=4.9" \
+        "mediapipe>=0.10.11,<=0.10.14" \
+        "numpy>=1.26,<2.0" \
+        "PyYAML>=6.0"
+
+# Copy source trees. `.dockerignore` filters out node_modules, venv, .git,
+# secrets, and runtime data folders.
+COPY app /app/app
+COPY docker /app/docker
+COPY scripts /app/scripts
+COPY ss3 /app/ss3
+
+# Install ss3 as an editable package so `backend.main` resolves and its
+# config loader finds `/app/ss3/backend/config.yaml`.
+RUN pip install -e /app/ss3
+
+# Frontend bundle from stage 1.
+COPY --from=frontend-build /build/dist /app/frontend/dist
+
+# Startup wrapper that runs both uvicorn processes.
+COPY docker/fly-start.sh /app/fly-start.sh
+RUN chmod +x /app/fly-start.sh
+
+# Runtime dirs. In production the /data mount replaces these with the Fly
+# volume; the empty defaults are fine when running the image without a mount.
+RUN mkdir -p /app/uploads /app/temp /app/outputs /data/cache/huggingface /data/ss3
+
+EXPOSE 8080
+
+CMD ["/app/fly-start.sh"]

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -16,6 +17,20 @@ logger = logging.getLogger("app.main")
 app = FastAPI(
     title="Speech Intelligence Platform",
     version="1.0.0",
+)
+
+# Enable CORS for Vercel frontend + ngrok + local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",  # Local Vite dev
+        "https://*.vercel.app",   # Vercel preview + production
+        "https://*.ngrok-free.app",  # ngrok tunnel
+        "https://*.ngrok.io",     # ngrok alternate domain
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

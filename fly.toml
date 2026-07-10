@@ -1,0 +1,70 @@
+# Fly.io config for the KIET Soft Skills platform.
+#
+# Deploys a single image that runs both the main FastAPI backend and the
+# ss3 gesture microservice side-by-side (see docker/fly-start.sh).
+
+app = "softskills-kiet-12"
+primary_region = "sin"  # Singapore — closest India-latency region on Fly
+
+kill_signal = "SIGINT"
+kill_timeout = "20s"
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  # These are non-secret defaults. Real values live in Fly secrets — see
+  # DEPLOY_FLY.md for the `flyctl secrets set` commands.
+  AUTH_BYPASS = "false"
+  PRONUNCIATION_PROVIDER = "hf_phoneme"
+  HF_PHONEME_MODEL_NAME = "facebook/wav2vec2-lv-60-espeak-cv-ft"
+
+  # Filesystem paths (all point at the /data Fly volume via symlinks
+  # created by fly-start.sh).
+  UPLOAD_DIR = "uploads"
+  OUTPUT_DIR = "outputs"
+  TEMP_DIR = "temp"
+
+  # Interview Studio talks to the co-located ss3 microservice over loopback.
+  CSA_SERVICE_URL = "http://127.0.0.1:8001"
+  CSA_DATA_DIR = "/data/ss3"
+  CSA_ANALYZE_TIMEOUT_SECONDS = "180"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  # Fly's default TCP-level health check is enough for FastAPI. We could
+  # add an HTTP check on /health here but it wakes the machine even when
+  # scaled to zero, so we leave it out for the free-tier friendly config.
+
+[[services.tcp_checks]]
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "20s"
+
+# Persistent volume for HF model cache (~1.4 GB), JSONL stores, uploaded
+# audio, and ss3 session videos. Created once via `flyctl volumes create`.
+[[mounts]]
+  source = "softskills_data"
+  destination = "/data"
+
+# Machine size. Whisper + Wav2Vec2 + mediapipe all resident → 2 GB is the
+# realistic minimum. Downshift to 1 GB (with PRONUNCIATION_PROVIDER=mock
+# and Interview Studio disabled) if you want a cheaper demo.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048

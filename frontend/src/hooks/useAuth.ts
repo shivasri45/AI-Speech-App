@@ -150,16 +150,15 @@ export function useAuth(): UseAuth {
         setLoading(false);
         return;
       }
-      const email = (fbUser.email ?? "").toLowerCase();
-      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
-        // Domain check on the client too — sign them out immediately so the
-        // backend never sees a forbidden token.
-        await firebaseSignOut(auth);
-        tokenRef.current = null;
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+      // Domain restriction temporarily disabled — any Gmail user allowed
+      // const email = (fbUser.email ?? "").toLowerCase();
+      // if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      //   await firebaseSignOut(auth);
+      //   tokenRef.current = null;
+      //   setUser(null);
+      //   setLoading(false);
+      //   return;
+      // }
       try {
         tokenRef.current = await fbUser.getIdToken();
       } catch {
@@ -201,12 +200,13 @@ export function useAuth(): UseAuth {
       if (!looksLikeEmail) {
         return { ok: false, error: "That doesn't look like a valid email." };
       }
-      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
-        return {
-          ok: false,
-          error: `Only @${ALLOWED_DOMAIN} accounts can sign in.`,
-        };
-      }
+      // Domain restriction temporarily disabled — any email allowed
+      // if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      //   return {
+      //     ok: false,
+      //     error: `Only @${ALLOWED_DOMAIN} accounts can sign in.`,
+      //   };
+      // }
       const next: AuthUser = {
         email,
         displayName: deriveDisplayName(email),
@@ -236,20 +236,19 @@ export function useAuth(): UseAuth {
       return { ok: false, error: "Firebase failed to initialize." };
     }
     const provider = new GoogleAuthProvider();
-    // Hint Google to prefer the @kiet.edu hosted-domain accounts when
-    // the user has Workspace. This is just a hint — the real enforcement is
-    // the email-domain check below.
-    provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
+    // Domain hint removed — any Gmail allowed now
+    // provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
     try {
-      const result = await signInWithPopup(auth, provider);
-      const email = (result.user.email ?? "").toLowerCase();
-      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
-        await firebaseSignOut(auth);
-        return {
-          ok: false,
-          error: `Only @${ALLOWED_DOMAIN} Google accounts can sign in.`,
-        };
-      }
+      await signInWithPopup(auth, provider);
+      // Domain restriction temporarily disabled — any Gmail user allowed
+      // const email = (result.user.email ?? "").toLowerCase();
+      // if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      //   await firebaseSignOut(auth);
+      //   return {
+      //     ok: false,
+      //     error: `Only @${ALLOWED_DOMAIN} Google accounts can sign in.`,
+      //   };
+      // }
       // onAuthStateChanged will set the user state.
       return { ok: true };
     } catch (err) {

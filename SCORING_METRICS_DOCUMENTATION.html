@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KIET Soft Skills Platform - Scoring Metrics Documentation</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-size: 28pt;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 12px;
+            margin-top: 30px;
+            page-break-after: avoid;
+        }
+        
+        h2 {
+            color: #34495e;
+            font-size: 20pt;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 10px;
+            margin-top: 25px;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            color: #2980b9;
+            font-size: 16pt;
+            margin-top: 20px;
+            page-break-after: avoid;
+        }
+        
+        h4 {
+            color: #7f8c8d;
+            font-size: 13pt;
+            margin-top: 15px;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 10pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-size: 9pt;
+            line-height: 1.4;
+            page-break-inside: avoid;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #2980b9;
+        }
+        
+        td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 20px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+        }
+        
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ecf0f1;
+            margin: 30px 0;
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                max-width: 100%;
+                padding: 0;
+            }
+            
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+            }
+            
+            table, pre, blockquote, img {
+                page-break-inside: avoid;
+            }
+            
+            a {
+                color: #000;
+            }
+        }
+        
+        /* Header for PDF */
+        .doc-header {
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .doc-header h1 {
+            margin: 0;
+            border: none;
+            color: #2c3e50;
+        }
+        
+        .doc-header p {
+            margin: 10px 0 0 0;
+            color: #7f8c8d;
+            font-size: 12pt;
+        }
+    </style>
+</head>
+<body>
+    <div class="doc-header">
+        <h1>KIET Soft Skills Platform</h1>
+        <p>Scoring Metrics Documentation</p>
+        <p style="font-size: 10pt; color: #95a5a6;">Comprehensive AI Scoring Algorithms | July 2026</p>
+    </div>
+    
+    <h1 id="kiet-soft-skills-platform-scoring-metrics-documentation">KIET Soft Skills Platform - Scoring Metrics Documentation</h1>
+<p><strong>Comprehensive guide to all AI scoring algorithms used across features</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-pronunciation-practice">Pronunciation Practice</a></li>
+<li><a href="#2-1v1-battle">1v1 Battle</a></li>
+<li><a href="#3-group-debate">Group Debate</a></li>
+<li><a href="#4-interview-studio-gesture--posture">Interview Studio (Gesture &amp; Posture)</a></li>
+<li><a href="#5-voice-cruisecontrol">Voice CruiseControl</a></li>
+</ol>
+<hr />
+<h2 id="1-pronunciation-practice">1. Pronunciation Practice</h2>
+<h3 id="overview">Overview</h3>
+<p>Analyzes uploaded audio against expected text to evaluate pronunciation accuracy, fluency, and clarity.</p>
+<h3 id="metrics-algorithms">Metrics &amp; Algorithms</h3>
+<h4 id="a-pronunciation-score-0-100">A. <strong>Pronunciation Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Phoneme-level acoustic analysis using HuggingFace Wav2Vec2</p>
+<p><strong>Process:</strong>
+1. <strong>Expected Phonemes Generation:</strong>
+   - Input text → CMU Pronouncing Dictionary lookup
+   - Example: "climate" → <code>['K', 'L', 'AY', 'M', 'AH', 'T']</code>
+   - 135,000+ word database (automatic, no manual input)</p>
+<ol>
+<li><strong>Observed Phonemes Detection:</strong></li>
+<li>Audio → Wav2Vec2 model (<code>facebook/wav2vec2-lv-60-espeak-cv-ft</code>)</li>
+<li>Acoustic analysis extracts phoneme sequence from waveform</li>
+<li>
+<p>Output: IPA phonemes converted to ARPAbet format</p>
+</li>
+<li>
+<p><strong>Similarity Calculation:</strong></p>
+</li>
+<li><strong>Levenshtein Edit Distance</strong> with weighted costs:<ul>
+<li>Substitution: 1.0 (wrong phoneme)</li>
+<li>Deletion: 1.0 (missing phoneme)</li>
+<li>Insertion: 0.5 (extra phoneme, less penalized)</li>
+</ul>
+</li>
+</ol>
+<p><code>python
+   similarity = 1.0 - (edit_distance / expected_length)
+   pronunciation_score = similarity * 100</code></p>
+<ol>
+<li><strong>Per-Word Scoring:</strong>
+   <code>python
+   if score &gt;= 85: "Good pronunciation"
+   elif score &gt;= 70: "Understandable. Practice for clarity"
+   elif score &gt;= 40: "Several sounds unclear. Slow down"
+   else: "Sounds very different from expected"</code></li>
+</ol>
+<p><strong>Technical Details:</strong>
+- Model size: ~370MB (downloaded on first use)
+- CPU inference: 2-5 seconds per audio clip
+- CMU Dict fallback for unknown words</p>
+<hr />
+<h4 id="b-clarity-score-0-100">B. <strong>Clarity Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> ASR confidence averaging</p>
+<p><strong>Process:</strong>
+1. Whisper model transcribes audio with per-word confidence
+2. Average confidence across all words × 100</p>
+<pre><code class="language-python">clarity_score = (sum(word.confidence for word in words) / len(words)) * 100
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-json">{
+  &quot;words&quot;: [
+    {&quot;word&quot;: &quot;hello&quot;, &quot;confidence&quot;: 0.95},
+    {&quot;word&quot;: &quot;world&quot;, &quot;confidence&quot;: 0.89}
+  ],
+  &quot;clarity_score&quot;: 92.0
+}
+</code></pre>
+<hr />
+<h4 id="c-fluency-metrics">C. <strong>Fluency Metrics</strong></h4>
+<p><strong>1. Words Per Minute (WPM)</strong></p>
+<pre><code class="language-python">speech_duration = last_word.end - first_word.start
+wpm = (total_words / speech_duration) * 60
+</code></pre>
+<p><strong>Benchmarks:</strong>
+- Slow: &lt;120 WPM
+- Conversational: 120-160 WPM
+- Fast: &gt;160 WPM</p>
+<p><strong>2. Speech Duration vs Total Duration</strong>
+- Total duration: Full audio file length
+- Speech duration: Only speaking time (excludes pauses)
+- Silence ratio calculated for future pause analysis</p>
+<hr />
+<h4 id="d-transcript-match-score-0-100">D. <strong>Transcript Match Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Sequence alignment between expected and heard text</p>
+<p><strong>Process:</strong>
+1. Normalize both texts (lowercase, remove punctuation)
+2. SequenceMatcher algorithm (similar to diff)
+3. Count matched vs mismatched words</p>
+<pre><code class="language-python">matcher = SequenceMatcher(expected_words, heard_words)
+match_score = (matched_words / total_expected_words) * 100
+</code></pre>
+<p><strong>Mistake Detection:</strong></p>
+<pre><code class="language-json">{
+  &quot;expected_word&quot;: &quot;subtle&quot;,
+  &quot;heard_word&quot;: &quot;suttle&quot;,
+  &quot;feedback&quot;: &quot;The word 'subtle' is often pronounced like 'suh-tl'; the b is silent.&quot;
+}
+</code></pre>
+<hr />
+<h2 id="2-1v1-battle">2. 1v1 Battle</h2>
+<h3 id="overview_1">Overview</h3>
+<p>Two players compete by recording the same prompt. Winner determined by pronunciation + clarity scores.</p>
+<h3 id="metrics">Metrics</h3>
+<h4 id="a-player-score-composite">A. <strong>Player Score</strong> (Composite)</h4>
+<p>Each player receives:
+1. <strong>Pronunciation Score</strong> (0-100) - Same algorithm as Pronunciation Practice
+2. <strong>Clarity Score</strong> (0-100) - Whisper confidence average
+3. <strong>Pace WPM</strong> - Speaking speed</p>
+<h4 id="b-star-verdicts-winner-selection">B. <strong>Star Verdicts</strong> (Winner Selection)</h4>
+<p>Three categories decide stars:</p>
+<p><strong>1. Pronunciation Star:</strong></p>
+<pre><code class="language-python">if abs(host_pron - opponent_pron) &lt; 5:
+    verdict = &quot;tie&quot;
+elif host_pron &gt; opponent_pron:
+    verdict = &quot;host&quot;
+else:
+    verdict = &quot;opponent&quot;
+</code></pre>
+<p><strong>2. Clarity Star:</strong></p>
+<pre><code class="language-python"># Same tie/win logic with clarity scores
+</code></pre>
+<p><strong>3. Pace Star:</strong></p>
+<pre><code class="language-python">ideal_pace = 145 WPM  # Target conversational speed
+host_deviation = abs(host_wpm - ideal_pace)
+opponent_deviation = abs(opponent_wpm - ideal_pace)
+
+# Winner = closer to ideal pace
+</code></pre>
+<h4 id="c-overall-winner">C. <strong>Overall Winner</strong></h4>
+<pre><code class="language-python"># Count stars won by each player
+if host_stars &gt; opponent_stars: winner = &quot;host&quot;
+elif opponent_stars &gt; host_stars: winner = &quot;opponent&quot;
+else: winner = &quot;draw&quot;
+</code></pre>
+<hr />
+<h2 id="3-group-debate">3. Group Debate</h2>
+<h3 id="overview_2">Overview</h3>
+<p>Multi-participant debate with turn-based speaking. AI scores each turn automatically.</p>
+<h3 id="metrics_1">Metrics</h3>
+<h4 id="a-ai-score-per-turn-0-100">A. <strong>AI Score per Turn</strong> (0-100)</h4>
+<p><strong>New Algorithm (With Pronunciation Enabled):</strong></p>
+<pre><code class="language-python">pronunciation_score = assess_pronunciation(audio, transcribed_text)
+clarity_score = average_whisper_confidence * 100
+
+# Both available: average them
+if pronunciation_score and clarity_score:
+    ai_score = (pronunciation_score + clarity_score) / 2
+
+# Only clarity available: use it directly
+elif clarity_score:
+    ai_score = clarity_score
+
+# Neither available: flag as unavailable
+else:
+    ai_score = 0.0
+    scoring_unavailable = True
+</code></pre>
+<p><strong>Components:</strong></p>
+<p><strong>1. Pronunciation Score (0-100):</strong>
+- Transcribed text → CMU Dictionary → expected phonemes
+- Audio → HF Wav2Vec2 → observed phonemes
+- Levenshtein similarity → score</p>
+<p><strong>2. Clarity Score (0-100):</strong>
+- Whisper ASR confidence average
+- Measures how clearly words were recognized</p>
+<p><strong>3. Fluency Metrics (Informational):</strong>
+- Words per minute
+- Speech duration
+- Total turn duration</p>
+<h4 id="b-winner-selection">B. <strong>Winner Selection</strong></h4>
+<pre><code class="language-python"># After all participants complete turns
+winner = participant_with_highest_ai_score
+</code></pre>
+<h4 id="c-teacher-override">C. <strong>Teacher Override</strong></h4>
+<ul>
+<li>Teachers can manually override AI scores</li>
+<li><code>teacher_override_score</code> takes precedence in final display</li>
+<li><code>teacher_comment</code> provides feedback text</li>
+</ul>
+<hr />
+<h2 id="4-interview-studio-gesture-posture">4. Interview Studio (Gesture &amp; Posture)</h2>
+<h3 id="overview_3">Overview</h3>
+<p>Video analysis of body language, posture, eye contact, gestures, and facial expressions using MediaPipe computer vision.</p>
+<h3 id="architecture">Architecture</h3>
+<ul>
+<li><strong>ss3 Microservice:</strong> Separate Python service running on port 8001</li>
+<li><strong>MediaPipe:</strong> Google's pose/face/hand landmark detection models</li>
+<li><strong>Frame Sampling:</strong> 5 FPS (5 frames per second analyzed)</li>
+</ul>
+<hr />
+<h3 id="metrics-algorithms_1">Metrics &amp; Algorithms</h3>
+<h4 id="a-posture-score-0-100">A. <strong>Posture Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Geometric angle analysis of body alignment</p>
+<p><strong>Landmarks Used:</strong>
+- Neck (nose to midpoint of shoulders)
+- Shoulders (left/right shoulder landmarks)
+- Hips (left/right hip landmarks)</p>
+<p><strong>Process:</strong>
+1. <strong>Neck-to-Shoulder Vector:</strong>
+   ```python
+   neck_angle = angle_from_vertical(nose_landmark, shoulder_midpoint)</p>
+<p># Thresholds
+   max_deviation = 15°  # Maximum acceptable tilt</p>
+<p>if neck_angle &lt;= max_deviation:
+       neck_score = 100
+   else:
+       neck_score = max(0, 100 - (neck_angle - max_deviation) * penalty_factor)
+   ```</p>
+<ol>
+<li><strong>Shoulder-to-Hip Vector:</strong>
+   ```python
+   torso_angle = angle_from_vertical(shoulder_midpoint, hip_midpoint)</li>
+</ol>
+<p># Thresholds
+   max_deviation = 10°  # Stricter than neck</p>
+<p>if torso_angle &lt;= max_deviation:
+       torso_score = 100
+   else:
+       torso_score = max(0, 100 - (torso_angle - max_deviation) * penalty_factor)
+   ```</p>
+<ol>
+<li><strong>Combined Posture Score:</strong>
+   <code>python
+   posture_score = (neck_score + torso_score) / 2</code></li>
+</ol>
+<p><strong>Flags:</strong>
+- <code>ok</code>: Normal scoring applied
+- <code>detection_failed</code>: Pose landmarks not detected
+- <code>low_confidence</code>: Insufficient landmark quality
+- <code>no_frames</code>: No valid frames sampled</p>
+<hr />
+<h4 id="b-eye-contact-score-0-100">B. <strong>Eye Contact Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Head orientation analysis using face mesh landmarks</p>
+<p><strong>Measurements:</strong>
+1. <strong>Head Yaw (Left-Right rotation):</strong>
+   ```python
+   yaw_threshold = 15°  # Maximum acceptable deviation</p>
+<p>on_camera_frames = count(abs(yaw) &lt;= yaw_threshold)
+   ```</p>
+<ol>
+<li><strong>Head Pitch (Up-Down tilt):</strong>
+   ```python
+   pitch_threshold = 15°  # Maximum acceptable deviation</li>
+</ol>
+<p>on_camera_frames = count(abs(pitch) &lt;= pitch_threshold)
+   ```</p>
+<ol>
+<li><strong>Score Calculation:</strong>
+   <code>python
+   on_camera_percentage = (on_camera_frames / total_frames) * 100
+   eye_contact_score = on_camera_percentage</code></li>
+</ol>
+<p><strong>Interpretation:</strong>
+- 90-100: Excellent eye contact (maintains camera focus)
+- 70-89: Good (occasional glances away)
+- 50-69: Moderate (frequent looking away)
+- &lt;50: Poor (mostly not looking at camera)</p>
+<hr />
+<h4 id="c-gesture-score-0-100">C. <strong>Gesture Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Hand-to-face proximity detection using hand landmarks</p>
+<p><strong>Purpose:</strong> Detect distracting gestures (touching face, hands near face)</p>
+<p><strong>Process:</strong>
+1. <strong>Hand Detection:</strong>
+   - MediaPipe Hand Landmarker detects hand keypoints
+   - Tracks both left and right hands</p>
+<ol>
+<li><strong>Face Detection:</strong></li>
+<li>
+<p>MediaPipe Face Mesh provides facial landmark positions</p>
+</li>
+<li>
+<p><strong>Proximity Calculation:</strong>
+   ```python
+   frame_diagonal = sqrt(width² + height²)
+   proximity_threshold = 0.10 * frame_diagonal  # 10% of diagonal</p>
+</li>
+</ol>
+<p>for each frame:
+       for each hand:
+           distance = euclidean(hand_center, face_center)
+           if distance &lt; proximity_threshold:
+               distraction_count += 1</p>
+<p>distraction_percentage = (distraction_count / total_frames) * 100
+   gesture_score = max(0, 100 - distraction_percentage)
+   ```</p>
+<p><strong>Scoring:</strong>
+- 90-100: Hands mostly away from face (professional)
+- 70-89: Occasional face touching
+- &lt;70: Frequent distracting hand movements</p>
+<hr />
+<h4 id="d-stillness-score-0-100">D. <strong>Stillness Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Frame-to-frame motion variance analysis</p>
+<p><strong>Purpose:</strong> Detect excessive fidgeting or movement (nervous behavior)</p>
+<p><strong>Process:</strong>
+1. <strong>Motion Tracking:</strong>
+   <code>python
+   # Track centroid of pose landmarks across frames
+   for each frame:
+       centroid = average_position(all_pose_landmarks)
+       displacement = distance(current_centroid, previous_centroid)
+       displacements.append(displacement)</code></p>
+<ol>
+<li><strong>Variance Calculation:</strong>
+   ```python
+   motion_variance = variance(displacements)</li>
+</ol>
+<p># Normalized thresholds
+   variance_min = 0.0005  # Below this = perfect stillness (score 100)
+   variance_max = 0.01    # Above this = excessive movement (score 0)
+   ```</p>
+<ol>
+<li><strong>Score Mapping:</strong>
+   <code>python
+   if motion_variance &lt;= variance_min:
+       stillness_score = 100
+   elif motion_variance &gt;= variance_max:
+       stillness_score = 0
+   else:
+       # Linear interpolation
+       ratio = (motion_variance - variance_min) / (variance_max - variance_min)
+       stillness_score = 100 - (ratio * 100)</code></li>
+</ol>
+<p><strong>Interpretation:</strong>
+- 90-100: Very calm, minimal movement
+- 70-89: Some natural movement
+- 50-69: Noticeable fidgeting
+- &lt;50: Excessive movement</p>
+<hr />
+<h4 id="e-facial-expression-score-0-100">E. <strong>Facial Expression Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Smile detection using mouth landmarks</p>
+<p><strong>Process:</strong>
+1. <strong>Smile Ratio Calculation:</strong>
+   ```python
+   # MediaPipe Face Mesh landmarks
+   mouth_corner_distance = distance(left_mouth_corner, right_mouth_corner)
+   inter_eye_distance = distance(left_eye, right_eye)</p>
+<p>smile_ratio = mouth_corner_distance / inter_eye_distance</p>
+<p># Threshold
+   smile_threshold = 0.45  # Ratio above this = smiling
+   ```</p>
+<ol>
+<li><strong>Frame Analysis:</strong>
+   ```python
+   smiling_frames = count(smile_ratio &gt; smile_threshold)
+   smile_percentage = (smiling_frames / total_frames) * 100</li>
+</ol>
+<p># Cap at 80% (excessive smiling looks unnatural)
+   capped_percentage = min(smile_percentage, 80)
+   ```</p>
+<ol>
+<li><strong>Score Calculation:</strong>
+   <code>python
+   # Linear rescale from 0-80% to 0-100 score
+   facial_expression_score = (capped_percentage / 80) * 100</code></li>
+</ol>
+<p><strong>Interpretation:</strong>
+- 80-100: Frequent, natural smiling (positive demeanor)
+- 60-79: Moderate positive expression
+- 40-59: Neutral expression
+- &lt;40: Serious/stern expression (may appear unfriendly)</p>
+<hr />
+<h4 id="f-overall-gesture-score-0-100">F. <strong>Overall Gesture Score</strong> (0-100)</h4>
+<p><strong>Algorithm:</strong> Weighted average of all 5 metrics</p>
+<p><strong>Weights (Configurable):</strong></p>
+<pre><code class="language-yaml">posture:           0.20  (20%)
+eye_contact:       0.25  (25%)
+gesture:           0.20  (20%)
+stillness:         0.15  (15%)
+facial_expression: 0.20  (20%)
+</code></pre>
+<p><strong>Process:</strong>
+1. <strong>Flag Filtering:</strong>
+   - Only metrics with <code>flag="ok"</code> participate
+   - Metrics with <code>detection_failed</code>, <code>low_confidence</code>, or <code>no_frames</code> are excluded</p>
+<ol>
+<li><strong>Weight Renormalization:</strong>
+   ```python
+   surviving_metrics = [m for m in metrics if m.flag == "ok"]</li>
+</ol>
+<p>if not surviving_metrics:
+       overall_score = 0
+       session_flag = "low_confidence"
+   else:
+       # Renormalize weights to sum to 1.0
+       total_weight = sum(weights[m.name] for m in surviving_metrics)</p>
+<pre><code>   for metric in surviving_metrics:
+       applied_weight = weights[metric.name] / total_weight
+
+   overall_score = sum(applied_weight * metric.score for each metric)
+</code></pre>
+<p>```</p>
+<ol>
+<li><strong>Rounding:</strong>
+   <code>python
+   final_score = max(0, min(100, round(overall_score)))</code></li>
+</ol>
+<p><strong>Example Calculation:</strong></p>
+<pre><code>Given:
+- Posture: 85 (ok) → weight 0.20
+- Eye Contact: 90 (ok) → weight 0.25
+- Gesture: 78 (ok) → weight 0.20
+- Stillness: 0 (detection_failed) → excluded
+- Facial Expression: 88 (ok) → weight 0.20
+
+Step 1: Filter out Stillness (flagged)
+Step 2: Renormalize remaining weights:
+  Total = 0.20 + 0.25 + 0.20 + 0.20 = 0.85
+
+  Posture: 0.20/0.85 = 0.235
+  Eye Contact: 0.25/0.85 = 0.294
+  Gesture: 0.20/0.85 = 0.235
+  Facial Expression: 0.20/0.85 = 0.235
+
+Step 3: Weighted average:
+  Overall = (85 × 0.235) + (90 × 0.294) + (78 × 0.235) + (88 × 0.235)
+          = 19.975 + 26.46 + 18.33 + 20.68
+          = 85.445
+          ≈ 85 (rounded)
+</code></pre>
+<hr />
+<h3 id="mediapipe-technical-details">MediaPipe Technical Details</h3>
+<p><strong>Models Used:</strong>
+- <strong>Pose Landmarker:</strong> 33 body keypoints (shoulders, hips, knees, etc.)
+- <strong>Face Mesh:</strong> 468 facial landmarks (eyes, nose, mouth, contours)
+- <strong>Hand Landmarker:</strong> 21 hand keypoints per hand</p>
+<p><strong>Performance:</strong>
+- Frame rate: 5 FPS sampling (balance between accuracy and speed)
+- Processing time: ~30-60 seconds for 2-minute video
+- Model size: ~50MB combined (downloaded on first use)</p>
+<p><strong>Reliability Flags:</strong></p>
+<pre><code class="language-python">if landmarks_confidence &lt; threshold:
+    flag = &quot;low_confidence&quot;
+elif no_pose_detected:
+    flag = &quot;detection_failed&quot;
+elif sampled_frames == 0:
+    flag = &quot;no_frames&quot;
+else:
+    flag = &quot;ok&quot;
+</code></pre>
+<hr />
+<h2 id="5-voice-cruisecontrol">5. Voice CruiseControl</h2>
+<h3 id="overview_4">Overview</h3>
+<p>Voice-controlled navigation using continuous speech recognition.</p>
+<h3 id="metrics_2">Metrics</h3>
+<h4 id="a-recognition-accuracy">A. <strong>Recognition Accuracy</strong></h4>
+<p><strong>Algorithm:</strong> Browser Web Speech API (Google Chrome)</p>
+<p><strong>Process:</strong>
+- Real-time ASR with interim results
+- Command matching against predefined menu options
+- Fuzzy matching for partial/misheard commands</p>
+<p><strong>No explicit scoring</strong> - binary match (command recognized or not)</p>
+<p><strong>Performance Metrics (Informational):</strong>
+- Recognition latency: ~500ms - 2s
+- Command accuracy: Depends on microphone quality and ambient noise</p>
+<hr />
+<h2 id="technical-stack-summary">Technical Stack Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>ASR Model</th>
+<th>Pronunciation</th>
+<th>Computer Vision</th>
+<th>Scoring Algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pronunciation</strong></td>
+<td>Whisper (small)</td>
+<td>HF Wav2Vec2 + CMU Dict</td>
+<td>N/A</td>
+<td>Levenshtein similarity</td>
+</tr>
+<tr>
+<td><strong>Battle</strong></td>
+<td>Whisper</td>
+<td>HF Wav2Vec2</td>
+<td>N/A</td>
+<td>Star-based comparison</td>
+</tr>
+<tr>
+<td><strong>Debate</strong></td>
+<td>Whisper</td>
+<td>HF Wav2Vec2</td>
+<td>N/A</td>
+<td>Weighted average (pron + clarity)</td>
+</tr>
+<tr>
+<td><strong>Interview</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>MediaPipe (pose/face/hand)</td>
+<td>Weighted average (5 metrics)</td>
+</tr>
+<tr>
+<td><strong>CruiseControl</strong></td>
+<td>Web Speech API</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>Command matching</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="model-sizes-performance">Model Sizes &amp; Performance</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Size</th>
+<th>First Load Time</th>
+<th>Inference Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Whisper (small)</strong></td>
+<td>~140 MB</td>
+<td>~30s download</td>
+<td>2-5s per audio</td>
+</tr>
+<tr>
+<td><strong>Wav2Vec2 Phoneme</strong></td>
+<td>~370 MB</td>
+<td>~60s download</td>
+<td>2-5s per audio</td>
+</tr>
+<tr>
+<td><strong>MediaPipe Pose</strong></td>
+<td>~6 MB</td>
+<td>Instant (built-in)</td>
+<td>Real-time (30+ FPS)</td>
+</tr>
+<tr>
+<td><strong>MediaPipe Face</strong></td>
+<td>~3 MB</td>
+<td>Instant</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td><strong>MediaPipe Hands</strong></td>
+<td>~10 MB</td>
+<td>Instant</td>
+<td>Real-time</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total disk usage:</strong> ~530 MB (models cached after first download)</p>
+<hr />
+<h2 id="scoring-transparency">Scoring Transparency</h2>
+<p>All scores include:
+- <strong>Numeric value</strong> (0-100 scale)
+- <strong>Interpretation label</strong> (Excellent/Good/Fair/Poor)
+- <strong>Per-component breakdown</strong> (where applicable)
+- <strong>Confidence flags</strong> (detection_failed, low_confidence, etc.)</p>
+<p>Students can see:
+- Overall score
+- Per-metric scores
+- Feedback messages</p>
+<p>Teachers can see:
+- All of the above
+- Raw metric values
+- Applied weights
+- Detection flags
+- Per-frame analysis (Interview Studio)</p>
+<hr />
+<h2 id="references-citations">References &amp; Citations</h2>
+<p><strong>Models:</strong>
+- OpenAI Whisper: https://github.com/openai/whisper
+- HuggingFace Wav2Vec2: https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft
+- MediaPipe: https://developers.google.com/mediapipe</p>
+<p><strong>Datasets:</strong>
+- CMU Pronouncing Dictionary: http://www.speech.cs.cmu.edu/cgi-bin/cmudict</p>
+<p><strong>Algorithms:</strong>
+- Levenshtein Distance: https://en.wikipedia.org/wiki/Levenshtein_distance
+- SequenceMatcher: Python difflib standard library</p>
+<hr />
+<p><strong>Document Version:</strong> 1.0<br />
+<strong>Last Updated:</strong> July 4, 2026<br />
+<strong>Platform:</strong> KIET Soft Skills Training System</p>
+    
+    <hr>
+    <p style="text-align: center; color: #95a5a6; font-size: 9pt; margin-top: 30px;">
+        Generated from SCORING_METRICS_DOCUMENTATION.md<br>
+        KIET Development Team • 2026
+    </p>
+</body>
+</html>

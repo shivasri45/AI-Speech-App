@@ -73,11 +73,12 @@ def _build_user_from_claims(claims: dict) -> User:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="token_missing_email",
         )
-    if not email.endswith(f"@{ALLOWED_EMAIL_DOMAIN}"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Email must be @{ALLOWED_EMAIL_DOMAIN}",
-        )
+    # Domain restriction temporarily disabled — any Gmail user can access
+    # if not email.endswith(f"@{ALLOWED_EMAIL_DOMAIN}"):
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail=f"Email must be @{ALLOWED_EMAIL_DOMAIN}",
+    #     )
     uid = claims.get("uid") or claims.get("user_id") or claims.get("sub")
     if not uid:
         raise HTTPException(

@@ -130,6 +130,10 @@ export interface AdminReviewPayload {
 // Fetch helpers — kept private to this module. Same shape as api.ts.
 // ---------------------------------------------------------------------------
 
+// Base URL for API calls — defaults to relative path (works with Vite proxy),
+// but in production uses VITE_API_URL to point to ngrok/deployed backend.
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
 async function authedHeaders(init?: RequestInit): Promise<Headers> {
   const headers = new Headers(init?.headers || {});
   const token = await getCurrentIdToken();
@@ -138,8 +142,9 @@ async function authedHeaders(init?: RequestInit): Promise<Headers> {
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const fullUrl = `${API_BASE_URL}${url}`;
   const headers = await authedHeaders(init);
-  const response = await fetch(url, { ...init, headers });
+  const response = await fetch(fullUrl, { ...init, headers });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(

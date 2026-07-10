@@ -1,0 +1,83 @@
+# Build artefacts that bloat the image or leak local state.
+# Docker COPY respects this at build time.
+
+# Version control
+.git
+.gitignore
+
+# Virtualenvs
+venv/
+env/
+.venv/
+
+# Python bytecode / caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.hypothesis/
+*.egg-info/
+build/
+dist/
+
+# Node modules (rebuilt in the frontend stage)
+frontend/node_modules/
+frontend/dist/
+
+# ss3's local dev artefacts (rebuilt in the image)
+ss3/frontend/node_modules/
+ss3/frontend/dist/
+ss3/.pytest_cache/
+ss3/**/__pycache__/
+ss3/communication_skills_analyzer.egg-info/
+
+# Runtime data (mounted volumes provide these in production)
+uploads/
+temp/
+outputs/
+ss3/data/
+models/
+speedometer/data/
+video-feature/data/
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentation-only paths
+docs/
+*.md
+!README.md
+
+# Kiro spec workspace (huge, not needed in image)
+.kiro/
+
+# Local secrets — MUST never end up in the image.
+# `.env` here matches at any depth by default, which would also exclude
+# `frontend/.env.production`. We explicitly re-allow that one below
+# because it holds the public Firebase web-SDK keys that Vite reads at
+# build time (domain-restricted, safe to bundle).
+.env
+.env.local
+.env.development
+.firebase-admin.json
+*.pem
+*.key
+
+!frontend/.env.production
+
+# Docker/compose (not needed inside the image itself)
+Dockerfile
+Dockerfile.fly
+docker-compose.yml
+docker-compose.https.yml
+Caddyfile
+
+# Test / CI artefacts
+.coverage
+htmlcov/
+coverage.xml
+test-results/

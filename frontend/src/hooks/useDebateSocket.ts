@@ -34,17 +34,28 @@ async function buildSocketUrl(
   roomCode: string,
   participantId: string,
 ): Promise<string> {
-  // Same-origin connection so the Vite dev proxy (or whatever serves the SPA
-  // in prod) routes it to the FastAPI backend on port 8080.
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = window.location.host;
+  // In development: same-origin connection via Vite dev proxy
+  // In production with VITE_API_URL: use that base URL converted to WebSocket protocol
+  const apiBaseUrl = import.meta.env.VITE_API_URL;
+  
+  let wsBase: string;
+  if (apiBaseUrl) {
+    // Convert HTTP(S) base URL to WS(S) protocol
+    wsBase = apiBaseUrl.replace(/^https?:/, (m: string) => (m === "https:" ? "wss:" : "ws:"));
+  } else {
+    // Same-origin (Vite dev proxy or static SPA serving)
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host;
+    wsBase = `${protocol}//${host}`;
+  }
+  
   const params = new URLSearchParams({ participant_id: participantId });
   // Browsers can't set headers on WebSocket connections, so pass the Firebase
   // ID token as a query param. Backend reads `id_token` and verifies before
   // accepting the connection.
   const token = await getCurrentIdToken();
   if (token) params.set("id_token", token);
-  return `${protocol}//${host}/debate/ws/${encodeURIComponent(
+  return `${wsBase}/debate/ws/${encodeURIComponent(
     roomCode,
   )}?${params.toString()}`;
 }

@@ -101,9 +101,14 @@ async def analyze_turn_audio(
         )
     )
 
+    # Enable pronunciation assessment using transcribed text as reference.
+    # HF phoneme model can assess acoustic quality even without pre-defined
+    # expected text by using the ASR transcript as the expected baseline.
+    expected_text_for_pronunciation = transcription.text if transcription.text else None
+    
     pronunciation = assess_pronunciation(
         audio_path=audio_asset.processed_path,
-        expected_text=None,
+        expected_text=expected_text_for_pronunciation,
         transcription=transcription,
         analysis_id=analysis_id,
     )
