@@ -209,3 +209,108 @@ async def submit_for_review(
         submission_id=submission.submission_id,
         status=submission.status,
     )
+
+
+# ---------------------------------------------------------------------------
+# Answer Content Scoring (Groq LLM)
+# ---------------------------------------------------------------------------
+
+
+class AnswerScoreRequest(BaseModel):
+    """Request to score the content of a spoken answer."""
+    question_prompt: str
+    question_category: str = "general"
+
+
+class AnswerScoreResponse(BaseModel):
+    """AI content score for an interview answer."""
+    relevance: int = 0
+    structure: int = 0
+    depth: int = 0
+    communication: int = 0
+    total: int = 0
+    feedback: str = ""
+    strengths: str = ""
+    improvements: str = ""
+    available: bool = False
+    error: str | None = None
+    transcript: str = ""
+
+
+@router.post("/score-answer", response_model=AnswerScoreResponse)
+async def score_answer(
+    audio: UploadFile = File(...),
+    question_prompt: str = "",
+    question_category: str = "general",
+    current_user: User = Depends(require_user),
+) -> AnswerScoreResponse:
+    """Score the content quality of a spoken interview answer.
+    
+    Accepts audio, transcribes it with Groq Whisper, then evaluates
+    the answer quality using Groq LLM.
+    
+    This is complementary to /interview/analyze (which scores body language).
+    Together they give a complete picture:
+    - /interview/analyze → gesture_score (body language)
+    - /interview/score-answer → content_score (what you said)
+    """
+    from app.asr.whisper_service import transcribe_audio
+    from app.audio.preprocessing import preprocess_audio_asset
+    from app.audio.storage import save_uploaded_audio
+    from app.interview.content_scoring import score_interview_answer
+    
+    logger.info(
+        "interview_score_answer user=%s question=%s",
+        current_user.email,
+        question_prompt[:50],
+    )
+    
+    # Step 1: Save and preprocess audio
+    try:
+        audio_asset = await save_uploaded_audio(audio)
+        audio_asset = preprocess_audio_asset(audio_asset)
+    except Exception as exc:
+        logger.warning(f"Audio processing failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not process audio file.",
+        )
+    
+    # Step 2: Transcribe with Groq Whisper (fast)
+    try:
+        transcription = transcribe_audio(str(audio_asset.processed_path))
+        transcript = transcription.text or transcription.normalized_text or ""
+    except Exception as exc:
+        logger.warning(f"Transcription failed: {exc}")
+        return AnswerScoreResponse(
+            error="Transcription failed",
+            feedback="Could not transcribe your answer. Please try again.",
+        )
+    
+    if not transcript or len(transcript.strip()) < 20:
+        return AnswerScoreResponse(
+            transcript=transcript,
+            feedback="Your answer was too short or unclear. Try speaking louder and longer (30+ seconds).",
+            error="transcript_too_short",
+        )
+    
+    # Step 3: Score content with LLM
+    result = await score_interview_answer(
+        transcript=transcript,
+        question_prompt=question_prompt,
+        question_category=question_category,
+    )
+    
+    return AnswerScoreResponse(
+        relevance=result.relevance,
+        structure=result.structure,
+        depth=result.depth,
+        communication=result.communication,
+        total=result.total,
+        feedback=result.feedback,
+        strengths=result.strengths,
+        improvements=result.improvements,
+        available=result.available,
+        error=result.error,
+        transcript=transcript,
+    )
