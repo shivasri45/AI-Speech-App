@@ -89,18 +89,24 @@ def transcribe_audio(audio_path: str):
     # Try Groq first if configured
     if is_groq_configured():
         try:
-            # Run async Groq call in sync context
-            loop = asyncio.new_event_loop()
+            # Handle both sync and async contexts
+            import asyncio as _asyncio
             try:
-                result = loop.run_until_complete(
-                    transcribe_with_groq(Path(audio_path))
-                )
-            finally:
-                loop.close()
+                loop = _asyncio.get_running_loop()
+                # We're inside an async context (FastAPI) - can't use run_until_complete
+                # Use a thread-based approach instead
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(
+                        _asyncio.run, transcribe_with_groq(Path(audio_path))
+                    )
+                    result = future.result(timeout=45)
+            except RuntimeError:
+                # No running loop - safe to create one
+                result = _asyncio.run(transcribe_with_groq(Path(audio_path)))
             
             if result is not None:
                 return result
-            # Groq returned None (rate limit / error) - fall back to local
             logger.info("Groq unavailable, falling back to local Whisper")
         except Exception as exc:
             logger.warning(
