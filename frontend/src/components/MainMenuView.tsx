@@ -8,6 +8,7 @@ import {
   Mic,
   Sparkles,
   Swords,
+  Users2,
 } from "lucide-react";
 import type { AuthUser } from "../types";
 
@@ -20,6 +21,7 @@ interface MainMenuViewProps {
   onSelectInterview: () => void;
   onSelectFourth: () => void;
   onSelectDebate: () => void;
+  onSelectGD: () => void;
   onSelectAdmin?: () => void;
 }
 
@@ -48,6 +50,7 @@ export function MainMenuView({
   onSelectInterview,
   onSelectFourth,
   onSelectDebate,
+  onSelectGD,
   onSelectAdmin,
 }: MainMenuViewProps) {
   const features: Feature[] = useMemo(
@@ -133,6 +136,22 @@ export function MainMenuView({
         onClick: onSelectDebate,
         ariaLabel: "Open group debate",
       },
+      {
+        id: "gd",
+        title: "Group Discussion",
+        tagline: "Phase 5 · New",
+        description:
+          "Real GD simulation with push-to-talk. 5-10 people, 15 min discussion, individual rankings.",
+        icon: Users2,
+        status: "live",
+        accent: "text-emerald-300",
+        gradient: "from-emerald-500/20 via-cyan-500/10 to-transparent",
+        ringGlow: "hover:shadow-[0_0_28px_-4px_rgba(16,185,129,0.45)]",
+        iconGlow:
+          "bg-gradient-to-br from-emerald-500 to-cyan-500 shadow-[0_0_18px_-4px_rgba(16,185,129,0.55)]",
+        onClick: onSelectGD,
+        ariaLabel: "Open group discussion",
+      },
     ];
 
       if (showAdmin && onSelectAdmin) {
@@ -162,6 +181,7 @@ export function MainMenuView({
       onSelectInterview,
       onSelectFourth,
       onSelectDebate,
+      onSelectGD,
       onSelectAdmin,
       showAdmin,
     ],

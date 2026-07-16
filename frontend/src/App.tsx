@@ -7,6 +7,7 @@ import { BattleLobbyView } from "./components/BattleLobbyView";
 import { BattleResultView } from "./components/BattleResultView";
 import { BattleRoomView } from "./components/BattleRoomView";
 import { DebateArenaView } from "./components/DebateArenaView";
+import { GDArenaView } from "./components/GDArenaView";
 import { Header } from "./components/Header";
 import { HomeView } from "./components/HomeView";
 import { InterviewStudioView } from "./components/InterviewStudioView";
@@ -39,6 +40,7 @@ type View =
   | "interview"
   | "cruise"
   | "debate-arena"
+  | "gd-arena"
   | "admin-panel"
   | "admin-review"
   | "admin-student";
@@ -197,6 +199,10 @@ export default function App() {
 
   const handleSelectDebate = useCallback(() => {
     setView("debate-arena");
+  }, []);
+
+  const handleSelectGD = useCallback(() => {
+    setView("gd-arena");
   }, []);
 
   const handleSelectAdmin = useCallback(() => {
@@ -431,6 +437,7 @@ export default function App() {
             onSelectInterview={handleSelectInterview}
             onSelectFourth={handleSelectFourth}
             onSelectDebate={handleSelectDebate}
+            onSelectGD={handleSelectGD}
             onSelectAdmin={handleSelectAdmin}
           />
         )}
@@ -509,6 +516,9 @@ export default function App() {
 
         {view === "debate-arena" && (
           <DebateArenaView onBack={handleBackToMenu} />
+        )}
+        {view === "gd-arena" && (
+          <GDArenaView onBack={handleBackToMenu} />
         )}
 
         {view === "admin-panel" && (

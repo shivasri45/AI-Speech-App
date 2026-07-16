@@ -45,6 +45,19 @@ async def startup():
     except Exception:
         logger.exception("Firebase Admin initialization failed")
         raise
+    
+    # Preload Whisper model in background to reduce first-request latency.
+    # This is non-blocking so the app can start serving requests immediately.
+    import asyncio
+    async def _preload_whisper():
+        try:
+            from app.asr.whisper_service import get_model
+            await asyncio.to_thread(get_model)
+            logger.info("Whisper model preloaded successfully")
+        except Exception as exc:
+            logger.warning(f"Whisper preload failed (will lazy-load): {type(exc).__name__}")
+    
+    asyncio.create_task(_preload_whisper())
 
 
 # Register API routes BEFORE static mounts so they take precedence.

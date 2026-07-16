@@ -59,6 +59,14 @@ export interface TurnUploadResponse {
   ai_score: number;
   scoring_unavailable: boolean;
   analysis_id: string | null;
+  content_score: number | null;
+  content_feedback: string | null;
+  score_breakdown: {
+    pronunciation?: { raw: number | null; weighted: number | null; weight: string };
+    fluency?: { raw: number | null; weighted: number | null; weight: string };
+    content?: { total: number | null; weight: string; feedback: string };
+    final_score?: number;
+  } | null;
   state: PublicDebateRoom;
 }
 

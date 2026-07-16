@@ -1,0 +1,92 @@
+[
+  {
+    "id": "wfh_vs_office",
+    "title": "Work From Home vs Office",
+    "text": "Discuss the pros and cons of work-from-home culture versus traditional office work. Consider productivity, work-life balance, career growth, and team collaboration.",
+    "category": "workplace"
+  },
+  {
+    "id": "ai_jobs",
+    "title": "AI and Future of Jobs",
+    "text": "Will AI create more jobs than it destroys? Discuss the impact of AI on employment, required skills for the future, and how India can prepare its workforce.",
+    "category": "technology"
+  },
+  {
+    "id": "social_media_impact",
+    "title": "Social Media Impact on Society",
+    "text": "How is social media shaping our society? Discuss its influence on mental health, politics, relationships, and information spread.",
+    "category": "society"
+  },
+  {
+    "id": "education_system",
+    "title": "Indian Education System",
+    "text": "Should the Indian education system focus more on practical skills over theoretical knowledge? Discuss curriculum reforms, exam pressure, and vocational training.",
+    "category": "education"
+  },
+  {
+    "id": "climate_action",
+    "title": "Climate Change: Individual vs Government Action",
+    "text": "Who bears more responsibility for climate action - individuals through lifestyle changes or governments through policies? Discuss with examples.",
+    "category": "environment"
+  },
+  {
+    "id": "startup_culture",
+    "title": "Startup vs Corporate Career",
+    "text": "For a fresh graduate, is joining a startup better than a corporate job? Discuss growth opportunities, learning, stability, and long-term career impact.",
+    "category": "career"
+  },
+  {
+    "id": "digital_privacy",
+    "title": "Digital Privacy vs Convenience",
+    "text": "Are we sacrificing too much privacy for digital convenience? Discuss data collection, surveillance, and the balance between privacy and personalized services.",
+    "category": "technology"
+  },
+  {
+    "id": "reservation_policy",
+    "title": "Reservation in Higher Education",
+    "text": "Should reservation policies in Indian higher education be based on economic status rather than caste? Discuss merit, social justice, and equal opportunity.",
+    "category": "policy"
+  },
+  {
+    "id": "cryptocurrency",
+    "title": "Cryptocurrency in India",
+    "text": "Should India embrace or restrict cryptocurrency? Discuss economic impact, financial inclusion, regulatory challenges, and youth investment trends.",
+    "category": "finance"
+  },
+  {
+    "id": "mental_health",
+    "title": "Mental Health in Colleges",
+    "text": "How can Indian colleges better support student mental health? Discuss counseling, academic pressure, awareness, and cultural stigma.",
+    "category": "health"
+  },
+  {
+    "id": "coding_skills",
+    "title": "Coding for Everyone?",
+    "text": "Should coding be a mandatory skill for all students, regardless of career path? Discuss digital literacy, career flexibility, and modern requirements.",
+    "category": "education"
+  },
+  {
+    "id": "global_vs_local",
+    "title": "Global Brands vs Local Businesses",
+    "text": "Are global brands harming local businesses in India? Discuss consumer choice, economic impact, cultural identity, and quality standards.",
+    "category": "economics"
+  },
+  {
+    "id": "gender_equality",
+    "title": "Women in STEM Fields",
+    "text": "Why are fewer women choosing STEM careers in India? Discuss societal factors, education system, workplace culture, and role models.",
+    "category": "society"
+  },
+  {
+    "id": "urban_migration",
+    "title": "Urban Migration and Tier-2 Cities",
+    "text": "Should young professionals continue migrating to metros or consider tier-2/3 cities? Discuss opportunities, cost of living, and quality of life.",
+    "category": "career"
+  },
+  {
+    "id": "online_learning",
+    "title": "Online Learning Effectiveness",
+    "text": "Is online learning as effective as classroom learning for professional courses? Discuss engagement, quality, accessibility, and skill development.",
+    "category": "education"
+  }
+]

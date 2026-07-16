@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { ToastProvider } from "./components/Toast";
 import "./index.css";
 // Side-effect import: registers dark-theme defaults for every Chart.js chart.
 import "./utils/chartDefaults";
@@ -12,6 +13,8 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </StrictMode>,
 );

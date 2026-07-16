@@ -218,6 +218,11 @@ class DebateTurn(BaseModel):
     scoring_unavailable: bool = False
     teacher_override_score: Optional[int] = Field(default=None, ge=0, le=100)
     teacher_comment: Optional[str] = None
+    
+    # Content scoring breakdown (LLM-based)
+    content_score: Optional[float] = None  # 0-50, from LLM content analysis
+    content_feedback: Optional[str] = None  # One-line feedback from LLM
+    score_breakdown: Optional[dict] = None  # Full breakdown: {pronunciation, fluency, content}
     submitted_at: float  # unix seconds
     forfeit_reason: Optional[Literal["timeout", "reconnect_timeout"]] = None
 
@@ -319,6 +324,9 @@ class TurnUploadResponse(BaseModel):
     ai_score: float
     scoring_unavailable: bool
     analysis_id: Optional[str] = None
+    content_score: Optional[float] = None  # 0-50 from LLM content analysis
+    content_feedback: Optional[str] = None  # One-line feedback
+    score_breakdown: Optional[dict] = None  # Full scoring breakdown
     state: PublicDebateRoom
 
 

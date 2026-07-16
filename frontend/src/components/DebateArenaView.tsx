@@ -296,12 +296,22 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
     if (state.paused) return;
     if (!isMyTurn) return;
     if (recorder.isRecording) return;
-    if (recorder.audioBlob) return;
     if (uploadingTurn) return;
+    // Don't check audioBlob - it may be stale from a previous turn
+    // Reset it here before starting fresh
+    recorder.reset();
     autoUploadRef.current = false;
-    void recorder.start();
+    
+    // Small delay to ensure DOM and state are fully settled
+    const startTimer = setTimeout(() => {
+      if (!recorder.isRecording) {
+        void recorder.start();
+      }
+    }, 50);
+    
+    return () => clearTimeout(startTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.state, state?.paused, isMyTurn]);
+  }, [state?.state, state?.paused, isMyTurn, state?.active_turn_index]);
 
   // ------- Safety net: stop recorder if we leave speaking -------
   useEffect(() => {
@@ -335,15 +345,24 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
     }
   }, [now, state, isMyTurn, recorder, handleUploadTurn]);
 
-  // Clear per-turn state when the active turn changes so a fresh recording
-  // can start next time this participant becomes active again (unlikely in
-  // round-robin, but keeps the state machine clean).
+  // Clear per-turn state when the active turn changes.
+  // IMPORTANT: Only reset for participants who are NOT the new active speaker,
+  // otherwise we break their recording before it starts.
   useEffect(() => {
+    // Skip reset if I'm the new active speaker - let auto-start handle it
+    if (isMyTurn) {
+      // Just clear the upload ref, don't reset recorder
+      autoUploadRef.current = false;
+      setUploadError(null);
+      return;
+    }
+    // For non-active speakers, fully reset state
     autoUploadRef.current = false;
     setUploadError(null);
+    setLastTurnResult(null);
     recorder.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.active_turn_index]);
+  }, [state?.active_turn_index, isMyTurn]);
 
   // ------- Lobby handlers -------
   const handleCreateRoom = useCallback(async () => {
@@ -414,11 +433,39 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
   }, [onBack]);
 
   const handleManualStop = useCallback(async () => {
-    if (!recorder.isRecording || uploadingTurn) return;
+    // Early return checks with better logging
+    if (uploadingTurn) {
+      console.log('[Debate] handleManualStop: already uploading, skipping');
+      return;
+    }
+    if (autoUploadRef.current) {
+      console.log('[Debate] handleManualStop: auto-upload already triggered, skipping');
+      return;
+    }
+    if (!recorder.isRecording) {
+      console.log('[Debate] handleManualStop: not recording, checking for existing blob');
+      // If we have a blob from a previous stop, try uploading it
+      if (recorder.audioBlob && recorder.audioBlob.size > 0) {
+        autoUploadRef.current = true;
+        await handleUploadTurn(recorder.audioBlob);
+      }
+      return;
+    }
+    
+    console.log('[Debate] handleManualStop: stopping recording and uploading');
     autoUploadRef.current = true;
-    const blob = await recorder.stop();
-    if (blob && blob.size > 0) {
-      await handleUploadTurn(blob);
+    try {
+      const blob = await recorder.stop();
+      if (blob && blob.size > 0) {
+        await handleUploadTurn(blob);
+      } else {
+        setUploadError("Recording produced no audio. Please try again.");
+        autoUploadRef.current = false;
+      }
+    } catch (err) {
+      console.error('[Debate] handleManualStop error:', err);
+      setUploadError(err instanceof Error ? err.message : "Failed to stop recording");
+      autoUploadRef.current = false;
     }
   }, [recorder, uploadingTurn, handleUploadTurn]);
 
@@ -897,9 +944,41 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
             Sabke turn ke baad AI scoring hogi.
           </p>
           {lastTurnResult && (
-            <div className="inline-flex items-center gap-2 chip-emerald">
-              <Check className="w-3 h-3" />
-              Your turn submitted · AI score {lastTurnResult.ai_score.toFixed(1)}
+            <div className="card-glass p-4 space-y-2 text-center max-w-md">
+              <div className="inline-flex items-center gap-2 chip-emerald">
+                <Check className="w-3 h-3" />
+                Turn submitted!
+              </div>
+              <div className="text-2xl font-bold text-zinc-100">
+                Score: {lastTurnResult.ai_score.toFixed(1)}/100
+              </div>
+              {lastTurnResult.score_breakdown && (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="bg-zinc-800/50 rounded-lg p-2">
+                    <div className="text-zinc-400">Pronunciation</div>
+                    <div className="text-zinc-100 font-semibold">
+                      {lastTurnResult.score_breakdown.pronunciation?.weighted?.toFixed(1) ?? "N/A"}/25
+                    </div>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-2">
+                    <div className="text-zinc-400">Fluency</div>
+                    <div className="text-zinc-100 font-semibold">
+                      {lastTurnResult.score_breakdown.fluency?.weighted?.toFixed(1) ?? "N/A"}/25
+                    </div>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-2">
+                    <div className="text-zinc-400">Content</div>
+                    <div className="text-zinc-100 font-semibold">
+                      {lastTurnResult.content_score?.toFixed(1) ?? "N/A"}/50
+                    </div>
+                  </div>
+                </div>
+              )}
+              {lastTurnResult.content_feedback && (
+                <p className="text-xs text-zinc-400 italic">
+                  "{lastTurnResult.content_feedback}"
+                </p>
+              )}
             </div>
           )}
         </div>

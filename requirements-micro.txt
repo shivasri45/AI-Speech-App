@@ -1,0 +1,38 @@
+# Lightweight requirements for AWS t3.micro (1GB RAM) deployment.
+# Uses Groq API for AI services instead of local models.
+# 
+# Install with:
+#   pip install --no-cache-dir -r requirements-micro.txt
+
+# Core web framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+
+# Data validation
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# Authentication
+firebase-admin==6.5.0
+
+# HTTP client for Groq API
+httpx==0.27.2
+
+# Environment
+python-dotenv==1.0.1
+
+# Audio utilities (minimal)
+numpy==1.26.4
+scipy==1.14.1
+pydub==0.25.1
+
+# For audio preprocessing (still needed even with cloud ASR)
+ffmpeg-python==0.2.0
+
+# NOT included (saves ~1.5GB):
+# - torch, torchaudio (700MB)
+# - openai-whisper (uses local model)
+# - transformers (Wav2Vec2 pronunciation)
+# - mediapipe (ss3 gesture analysis)
+# - opencv-python (video processing)

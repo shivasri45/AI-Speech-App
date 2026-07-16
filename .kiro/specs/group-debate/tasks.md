@@ -61,17 +61,17 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - Implement `compute_winner(turns, participants) -> Optional[str]` per the same section. Sort key: `(-effective_score, submitted_at ASC, turn_index ASC, participant_id)`. Return `None` when no eligible turns.
     - _Requirements: 9.2, 9.3, 9.4, 10.4_
 
-  - [~] 3.2 Write property test for effective score priority
+  - [ ] 3.2 Write property test for effective score priority
     - In `tests/test_debate_scoring.py`, randomized test (N=100) that generates `DebateTurn` instances with random `ai_score` in `[0, 100]` and `teacher_override_score` drawn from `{None, random int in [0, 100]}`. Assert `compute_effective_score(turn)` equals `float(teacher_override_score)` when present, `float(ai_score)` otherwise.
     - **Property 4: Effective_Score priority**
     - **Validates: Requirements 10.3, 10.4**
 
-  - [~] 3.3 Write property test for winner determinism and cascade
+  - [ ] 3.3 Write property test for winner determinism and cascade
     - In `tests/test_debate_scoring.py`, randomized test (N=100) that generates a random participant list (size 4–6) and one turn per participant with random `ai_score`, `teacher_override_score`, `submitted_at`, and `turn_index`. Assert (a) two calls with equal inputs return equal ids, (b) the returned participant's effective score `>=` every other's, (c) tiebreakers unfold as documented (verify by re-sorting a mirror of the tuple key).
     - **Property 5: Winner determinism and tiebreaker cascade**
     - **Validates: Requirements 9.2, 9.3, 9.4**
 
-  - [~] 3.4 Write property test for forfeit turn shape
+  - [ ] 3.4 Write property test for forfeit turn shape
     - In `tests/test_debate_scoring.py`, randomized test (N=100) that generates `DebateTurn` instances with `forfeit_reason` drawn from `{"timeout", "reconnect_timeout"}`. Assert every such turn satisfies `ai_score == 0.0` AND `scoring_unavailable is False` (this is an invariant the room manager must uphold; the property doubles as a contract check).
     - **Property 6: Forfeit turn has ai_score 0**
     - **Validates: Requirements 5.6, 8.3**
@@ -91,11 +91,11 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - Treat `pronunciation is None` or `pronunciation.available is False` as pron-unavailable.
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [~] 4.3 Write unit test for `analyze_turn_audio` stage order
+  - [ ] 4.3 Write unit test for `analyze_turn_audio` stage order
     - Add `tests/test_debate_service.py`. Patch each of the five stage functions with `MagicMock` returning deterministic stubs and call `await analyze_turn_audio(mock_upload_file, mock_user)`. Assert (a) each stage function was called exactly once, (b) `save_uploaded_audio` called before `preprocess_audio_asset`, `preprocess_audio_asset` before `transcribe_audio`, `transcribe_audio` before `assess_pronunciation`, `assess_pronunciation` before `build_fluency_section` — verify via `mock_calls` ordering, (c) `assess_pronunciation` was invoked with `expected_text=None`.
     - _Requirements: 5.3, 16.4_
 
-  - [~] 4.4 Write property test for `compute_ai_score` clamping and fallback
+  - [ ] 4.4 Write property test for `compute_ai_score` clamping and fallback
     - In `tests/test_debate_service.py`, randomized test (N=100) that generates random `PronunciationResult` (available True/False, `overall_score` in `[-50, 150]` including `None`) and random `FluencyResult` with `clarity_score` in `[-50, 150]` including `None`. Assert (a) return `[0, 100]` always, (b) when both present and available → `(round((p+c)/2, 2), False)` clamped, (c) when only clarity → `(round(c, 2), False)` clamped, (d) when neither → `(0.0, True)`.
     - **Property 3: AI_Score in [0, 100]**
     - **Validates: Requirements 6.4**
@@ -112,15 +112,15 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - `apply_teacher_review` MUST use `overwrite_jsonl` to rewrite the file in place with the target row updated; return the updated `DebateTurn` or `None` if the id is unknown.
     - _Requirements: 5.4, 10.3, 15.2_
 
-  - [~] 5.3 Write property test for turn round-trip
+  - [ ] 5.3 Write property test for turn round-trip
     - Add `tests/test_debate_storage.py`. Randomized test (N=100) that generates a random list of `DebateTurn` and, using `monkeypatch` to point `_PATH` at `tmp_path`, appends each via `save_turn` and asserts every id round-trips through `load_turn` to an equivalent record.
     - _Requirements: 15.2_
 
-  - [~] 5.4 Write property test for debate record round-trip
+  - [ ] 5.4 Write property test for debate record round-trip
     - In `tests/test_debate_storage.py`, randomized test (N=100) for `save_debate` / `load_debate` and `list_debates_for_user` filtering. Assert (a) round-trip equality on JSON dump, (b) `list_debates_for_user` returns exactly the records whose `participants[*].user_id` includes the queried user.
     - _Requirements: 13.1, 15.1_
 
-  - [~] 5.5 Write property test for teacher review overwrite
+  - [ ] 5.5 Write property test for teacher review overwrite
     - In `tests/test_debate_storage.py`, randomized test (N=100) that generates N turns, saves them, picks one at random, calls `apply_teacher_review(turn_id, score, comment)` with random score in `[0, 100]` and random comment, then reloads and asserts (a) the target row now has the new score + comment, (b) every other row is unchanged.
     - _Requirements: 10.3_
 
@@ -162,27 +162,27 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - `broadcast(code)`: build `PublicDebateRoom` via `to_public`, send `{"type": "state", "state": public}` to every open socket for the room. Best-effort delivery — ignore per-socket send exceptions and log at WARNING.
     - _Requirements: 2.5, 11.2, 11.5_
 
-  - [~] 6.7 Write unit test for room code alphabet and length
+  - [ ] 6.7 Write unit test for room code alphabet and length
     - Add `tests/test_debate_room_manager.py`. Randomized test (N=100) that calls `_random_code()` and asserts `len(code) == 6` and every character is in `ROOM_CODE_ALPHABET` (excludes `0`, `O`, `1`, `I`, `L`).
     - **Property 1: Room code shape**
     - **Validates: Requirements 1.1**
 
-  - [~] 6.8 Write unit test for room capacity cap
+  - [ ] 6.8 Write unit test for room capacity cap
     - In `tests/test_debate_room_manager.py`, example-based test: create a room, add 6 distinct users via `join_room`, then attempt a 7th join and assert `HTTPException(status_code=409, detail="room_full")` is raised and the participant list length stays at 6.
     - **Property 7: Room capacity cap**
     - **Validates: Requirements 2.3**
 
-  - [~] 6.9 Write unit test for auto-start threshold
+  - [ ] 6.9 Write unit test for auto-start threshold
     - In `tests/test_debate_room_manager.py`, randomized test (N=100) that joins `n` participants (n in `{2, 3, 4, 5, 6}`) and flips a random subset ready. Assert `room.state == "prep"` iff every participant is ready AND `n >= 4`; otherwise `room.state == "waiting"`.
     - **Property 8: Auto-start threshold**
     - **Validates: Requirements 3.2, 3.5**
 
-  - [~] 6.10 Write unit test for deadline durations
+  - [ ] 6.10 Write unit test for deadline durations
     - In `tests/test_debate_room_manager.py`, example-based tests using `freezegun` or a monkeypatched `time.time`: (a) drive a room into `prep` and assert `prep_deadline - trigger_time ∈ [59.5, 60.5]`; (b) drive it into `speaking` and assert `turn_deadline - trigger_time ∈ [134.5, 135.5]`; (c) trigger a WS disconnect during `speaking` and assert `reconnect_deadline - trigger_time ∈ [29.5, 30.5]`.
     - **Property 9: Deadline durations**
     - **Validates: Requirements 4.1, 4.2, 5.6, 8.1**
 
-  - [~] 6.11 Write unit test for forfeit-on-timeout and state transitions
+  - [ ] 6.11 Write unit test for forfeit-on-timeout and state transitions
     - In `tests/test_debate_room_manager.py`, drive a synthetic 4-participant room through the full state sequence `waiting → prep → speaking → speaking → speaking → speaking → scoring → complete`. Record every observed `room.state` value; assert every consecutive pair appears in the transition table (Section 3 of `design.md`). Separately, simulate the active speaker missing the 135s window and assert the emitted `DebateTurn` has `forfeit_reason == "timeout"`, `ai_score == 0.0`, `scoring_unavailable == False`.
     - **Property 2: State transitions follow the documented edges**
     - **Validates: Requirements 7.1, 7.5**
@@ -204,16 +204,16 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - On success `await websocket.accept()`, immediately send the current `to_public(room)` as `{"type":"state","state":...}`, register via `room_manager.attach_socket`, then loop `await websocket.receive_text()` accepting only `{"type":"ping"}` inbound. On `WebSocketDisconnect` call `room_manager.handle_disconnect(code, participant_id)`.
     - _Requirements: 11.2, 11.3, 11.4, 11.5_
 
-  - [~] 7.4 Write integration test for the WS close-code contract
+  - [ ] 7.4 Write integration test for the WS close-code contract
     - Add `tests/test_debate_routes.py`. Using `TestClient.websocket_connect("/debate/ws/UNKNOWN", params={"id_token": VALID_TOKEN})` assert the connection closes with code `4404`. Using an invalid token against a real room assert the connection closes with code `4401` and never receives an accepted state message. Repeat both for N=50 randomized token/room combinations.
     - **Property 12: WebSocket close code mapping**
     - **Validates: Requirements 11.3, 11.4**
 
-  - [~] 7.5 Write integration test for the full HTTP round-trip
+  - [ ] 7.5 Write integration test for the full HTTP round-trip
     - In `tests/test_debate_routes.py`, monkey-patch `analyze_turn_audio` to return a synthetic 5-tuple. Drive four fake users through create → join → ready → auto-start → prep-timer-tick → speaking → four turn uploads → complete. Assert every intermediate `GET /debate/rooms/{code}` returns the expected state and the final response includes a non-null `winner_participant_id`.
     - _Requirements: 5.1, 5.3, 7.1, 7.3, 11.1_
 
-  - [~] 7.6 Write integration test for room_full and race errors
+  - [ ] 7.6 Write integration test for room_full and race errors
     - In `tests/test_debate_routes.py`, example-based tests: (a) join 7 users to one room and assert the 7th call returns 409 with `detail=="room_full"`; (b) upload a turn while `paused=True` and assert 409 with `detail=="debate_paused"`; (c) upload a turn as a non-active-speaker and assert 409 with `detail=="not_your_turn"`.
     - _Requirements: 2.3, 5.2, 8.4_
 
@@ -228,15 +228,15 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - Return the updated `DebateTurn` as the response body.
     - _Requirements: 10.4_
 
-  - [~] 8.3 Write integration test for teacher override + winner recompute
+  - [ ] 8.3 Write integration test for teacher override + winner recompute
     - In `tests/test_debate_admin_routes.py`, seed a debate with 4 completed turns where participant A has the highest `ai_score`. As a teacher, POST a review that gives participant B a `teacher_override_score` strictly greater than A's `ai_score`. Assert (a) the returned turn has the new score/comment, (b) `debates.load_debate(debate_id).winner_participant_id == B.participant_id`.
     - _Requirements: 10.3, 10.4_
 
-  - [~] 8.4 Write integration test for auth guard
+  - [ ] 8.4 Write integration test for auth guard
     - In `tests/test_debate_admin_routes.py`, hit each of `GET /admin/debates`, `GET /admin/debates/{id}`, `POST /admin/debates/{id}/turns/{tid}/review` as a non-teacher user and assert the `require_teacher` failure response (403 or the same status the existing admin routes return).
     - _Requirements: 10.5_
 
-  - [~] 8.5 Write integration test for invalid score
+  - [ ] 8.5 Write integration test for invalid score
     - In `tests/test_debate_admin_routes.py`, randomized test (N=50) that POSTs a `score` drawn from `{-1, 101, 200, -100, "abc", None, 3.5}` and asserts a 422 response with `detail` referencing `invalid_score` (or Pydantic's validation error shape). Also test the happy path with `score=75`.
     - _Requirements: 10.6_
 
@@ -254,7 +254,7 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - `uploadTurn(code, audio)` posts a multipart form (`FormData` with `file` field) to `/debate/rooms/{code}/turn`.
     - _Requirements: 14.2_
 
-  - [~] 10.2 Write TypeScript sanity via `npx tsc --noEmit`
+  - [ ] 10.2 Write TypeScript sanity via `npx tsc --noEmit`
     - Add a small `frontend/src/debateApi.spec.ts` file (or reuse an existing test harness if one exists) that imports every exported symbol from `debateApi.ts` and asserts the type shape via `satisfies` clauses. Manual verification: `npx tsc --noEmit` from `frontend/` completes with zero errors.
     - _Requirements: 14.2_
 
@@ -265,7 +265,7 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - Client MUST send only `{"type":"ping"}` outbound. Inbound `{"type":"state","state":...}` messages update the `state` field.
     - _Requirements: 14.3_
 
-  - [~] 11.2 Write hook-level sanity test
+  - [ ] 11.2 Write hook-level sanity test
     - Add `frontend/src/hooks/useDebateSocket.test.ts` using `@testing-library/react` (if already installed) or a lightweight mock harness. Assert that (a) the hook opens a WS to the expected URL, (b) an incoming `state` message updates the returned `state` field, (c) `4401` close prevents further reconnect attempts.
     - _Requirements: 14.3_
 
@@ -287,7 +287,7 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - No other view branches or state fields change.
     - _Requirements: 14.1, 16.3_
 
-  - [~] 12.4 Manual smoke check for the arena view
+  - [ ] 12.4 Manual smoke check for the arena view
     - Not automated: run the dev server (backend + `npm run dev`), open 4 tabs, join by code, ready up, verify the prep countdown, each turn's timer, and the final results screen render as expected.
     - _Requirements: 14.1, 14.4_
 
@@ -307,7 +307,7 @@ Test sub-tasks marked with `*` are optional. Property tests reference their desi
     - On successful submit, refresh the panel and, if the response indicates a winner change, surface a small "Winner updated" toast.
     - _Requirements: 10.3, 10.4, 14.5_
 
-  - [~] 13.4 Type-check the new admin components
+  - [ ] 13.4 Type-check the new admin components
     - Not a separate file: after 13.1–13.3, run `npx tsc --noEmit` from `frontend/` and assert zero errors across the new files and the additive edits.
     - _Requirements: 14.5_
 

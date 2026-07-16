@@ -1,6 +1,10 @@
+import asyncio
+from pathlib import Path
+
 import torch
 import whisper
 
+from app.asr.groq_whisper import is_groq_configured, transcribe_with_groq
 from app.asr.schemas import TranscribedWord
 from app.asr.schemas import TranscriptionResult
 from app.core.logger import logger
@@ -50,8 +54,9 @@ def _extract_words(segments):
     return transcribed_words
 
 
-def transcribe_audio(audio_path: str):
-    logger.info(f"Starting transcription: {audio_path}")
+def _transcribe_local(audio_path: str) -> TranscriptionResult:
+    """Local Whisper transcription (fallback when Groq unavailable)."""
+    logger.info(f"Local Whisper transcribing: {audio_path}")
 
     raw_result = get_model().transcribe(
         audio_path,
@@ -60,29 +65,47 @@ def transcribe_audio(audio_path: str):
         word_timestamps=True
     )
 
-    text = raw_result.get(
-        "text",
-        ""
-    )
-
-    segments = raw_result.get(
-        "segments",
-        []
-    )
+    text = raw_result.get("text", "")
+    segments = raw_result.get("segments", [])
 
     result = TranscriptionResult(
         text=text,
         normalized_text=normalize_transcript(text),
-        language=raw_result.get(
-            "language",
-            "en"
-        ),
+        language=raw_result.get("language", "en"),
         provider=PROVIDER_NAME,
         model=MODEL_NAME,
         words=_extract_words(segments),
         segments=segments
     )
-
-    logger.info("Transcription complete")
-
+    logger.info("Local transcription complete")
     return result
+
+
+def transcribe_audio(audio_path: str):
+    """Transcribe audio - tries Groq API first, falls back to local Whisper.
+    
+    Groq is 5-10x faster than local CPU inference and free (20K seconds/day).
+    """
+    # Try Groq first if configured
+    if is_groq_configured():
+        try:
+            # Run async Groq call in sync context
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(
+                    transcribe_with_groq(Path(audio_path))
+                )
+            finally:
+                loop.close()
+            
+            if result is not None:
+                return result
+            # Groq returned None (rate limit / error) - fall back to local
+            logger.info("Groq unavailable, falling back to local Whisper")
+        except Exception as exc:
+            logger.warning(
+                f"Groq transcription error: {type(exc).__name__}, using local"
+            )
+    
+    # Fallback to local Whisper
+    return _transcribe_local(audio_path)

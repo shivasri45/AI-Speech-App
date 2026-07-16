@@ -45,7 +45,7 @@ from app.debate.schemas import (
     to_public,
 )
 from app.debate.scoring import compute_effective_score, compute_winner
-from app.debate.service import compute_ai_score
+from app.debate.service import compute_ai_score, compute_ai_score_with_content
 from app.fluency.schemas import FluencyResult
 from app.schemas.pronunciation_schema import PronunciationResult
 from app.storage import debate_turns as debate_turns_store
@@ -344,23 +344,70 @@ class DebateRoomManager:
 
             participant.is_ready = not participant.is_ready
 
-            if (
+            # If any participant un-readies, cancel pending auto-start timer
+            if not participant.is_ready:
+                self._cancel_timer(code, "auto_start_grace")
+
+            # Auto-start conditions:
+            # 1. All participants are ready AND
+            # 2. Either at MAX capacity (6) OR at least MIN (4) with grace time
+            # This gives late joiners a chance to enter before room locks.
+            all_ready_condition = (
                 room.state == "waiting"
                 and len(room.participants) >= MIN_PARTICIPANTS
                 and all(p.is_ready for p in room.participants)
-            ):
-                # Stable turn_index in join order (already assigned on
-                # join; re-verify to keep the invariant explicit).
+            )
+            
+            if all_ready_condition and len(room.participants) >= MAX_PARTICIPANTS:
+                # Full room + all ready → start immediately
                 for idx, p in enumerate(room.participants):
                     p.turn_index = idx
                 room.state = "prep"
                 room.prep_deadline = time.time() + PREP_SECONDS
                 should_start_prep = True
+            elif all_ready_condition:
+                # Below max + all ready → schedule delayed start (20s grace)
+                # so late joiners can still enter. Cancel if someone unready.
+                self._spawn_timer(
+                    code, "auto_start_grace",
+                    self._delayed_auto_start(code, delay=20.0),
+                )
 
         if should_start_prep:
             self._spawn_timer(code, "prep", self._run_prep_timer(code))
         await self.broadcast(code)
         return self._rooms[code]
+
+    async def _delayed_auto_start(self, code: str, delay: float = 20.0) -> None:
+        """Wait `delay` seconds then start prep IF still all-ready.
+        
+        This gives late joiners a chance to enter the room after minimum
+        participants are ready. If someone un-readies or leaves during the
+        grace period, the timer is cancelled by the next flip_ready call.
+        """
+        try:
+            await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            return
+        
+        async with self._lock_for(code):
+            room = self._rooms.get(code)
+            if room is None or room.state != "waiting":
+                return
+            # Re-check conditions after grace period
+            if not (
+                len(room.participants) >= MIN_PARTICIPANTS
+                and all(p.is_ready for p in room.participants)
+            ):
+                return
+            # Start prep phase
+            for idx, p in enumerate(room.participants):
+                p.turn_index = idx
+            room.state = "prep"
+            room.prep_deadline = time.time() + PREP_SECONDS
+        
+        self._spawn_timer(code, "prep", self._run_prep_timer(code))
+        await self.broadcast(code)
 
     async def _run_prep_timer(self, code: str) -> None:
         try:
@@ -409,11 +456,37 @@ class DebateRoomManager:
         - ``not_a_participant`` — caller is not in the room.
         - ``not_your_turn`` — caller's turn_index != active_turn_index.
         """
+        # Get room info outside the lock for content scoring
+        room = self._rooms.get(code)
+        if room is None:
+            raise ValueError("room_not_found")
+        
+        motion_title = room.motion_title
+        motion_text = room.motion_text
+        transcript_text = transcription.text if transcription else ""
+
+        # Run content scoring outside the lock (it's async and may take time)
+        try:
+            ai_score, scoring_unavailable, score_breakdown = await compute_ai_score_with_content(
+                pronunciation=pronunciation,
+                fluency=fluency,
+                transcript=transcript_text,
+                motion_title=motion_title,
+                motion_text=motion_text,
+            )
+            content_score = score_breakdown.get("content", {}).get("total")
+            content_feedback = score_breakdown.get("content", {}).get("feedback", "")
+        except Exception as exc:
+            logger.warning(f"Content scoring failed, falling back: {exc}")
+            # Fallback to basic scoring
+            ai_score, scoring_unavailable = compute_ai_score(pronunciation, fluency)
+            content_score = None
+            content_feedback = "Content scoring unavailable"
+            score_breakdown = None
+
         async with self._lock_for(code):
             room = self._rooms.get(code)
             if room is None:
-                # The route layer already 404s before we get here, but
-                # keep this branch defensive.
                 raise ValueError("room_not_found")
             if room.state != "speaking":
                 raise ValueError("not_in_speaking_state")
@@ -425,10 +498,6 @@ class DebateRoomManager:
             if participant.turn_index != room.active_turn_index:
                 raise ValueError("not_your_turn")
 
-            ai_score, scoring_unavailable = compute_ai_score(
-                pronunciation, fluency
-            )
-
             turn = DebateTurn(
                 turn_id=uuid.uuid4().hex,
                 debate_id=room.debate_id,
@@ -439,6 +508,9 @@ class DebateRoomManager:
                 scoring_unavailable=bool(scoring_unavailable),
                 submitted_at=time.time(),
                 forfeit_reason=None,
+                content_score=content_score,
+                content_feedback=content_feedback,
+                score_breakdown=score_breakdown,
             )
             debate_turns_store.save_turn(turn)
 

@@ -17,8 +17,11 @@ Public callables:
 - ``compute_ai_score(pronunciation, fluency)``: pure function that folds
   the two per-turn signals into a single 0–100 score, returning also a
   boolean flag when neither signal was usable.
+- ``compute_ai_score_with_content(...)``: enhanced scoring including LLM
+  content analysis (relevance, arguments, structure, vocabulary).
 """
 
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import UploadFile
@@ -33,6 +36,7 @@ from app.audio.storage import save_uploaded_audio
 from app.auth import User
 from app.core.logging_helpers import logger
 from app.core.logging_helpers import stage_log
+from app.debate.content_scoring import score_debate_content, ContentScoreResult
 from app.fluency.schemas import FluencyResult
 from app.fluency.service import build_fluency_section
 from app.pronunciation.service import assess_pronunciation
@@ -214,3 +218,122 @@ def compute_ai_score(
     if clarity is not None:
         return round(max(0.0, min(100.0, float(clarity))), 2), False
     return 0.0, True
+
+
+
+async def compute_ai_score_with_content(
+    pronunciation: PronunciationResult,
+    fluency: FluencyResult,
+    transcript: str,
+    motion_title: str,
+    motion_text: str,
+) -> tuple[float, bool, dict]:
+    """Enhanced AI scoring including content analysis.
+
+    Scoring weights:
+    - Pronunciation: 25% (0-25 points from 0-100 score)
+    - Fluency: 25% (0-25 points from clarity 0-100)
+    - Content: 50% (0-50 points from LLM analysis)
+
+    Total: 0-100 points
+
+    Args:
+        pronunciation: Result from pronunciation assessment
+        fluency: Result from fluency analysis
+        transcript: Speaker's transcribed text
+        motion_title: Debate motion title
+        motion_text: Debate motion full text
+
+    Returns:
+        Tuple of (final_score, scoring_unavailable, breakdown_dict)
+    """
+    # Get pronunciation score (0-100 -> 0-25)
+    pron_raw = (
+        pronunciation.overall_score
+        if pronunciation is not None and pronunciation.available
+        else None
+    )
+    pron_score = (pron_raw / 100.0 * 25.0) if pron_raw is not None else None
+
+    # Get fluency clarity score (0-100 -> 0-25)
+    clarity_raw = fluency.clarity_score if fluency is not None else None
+    fluency_score = (clarity_raw / 100.0 * 25.0) if clarity_raw is not None else None
+
+    # Get content score from LLM (0-50)
+    content_result: Optional[ContentScoreResult] = None
+    content_score: Optional[float] = None
+    content_feedback: str = ""
+
+    if transcript and len(transcript.strip()) >= 20:
+        try:
+            content_result = await score_debate_content(
+                transcript=transcript,
+                motion_title=motion_title,
+                motion_text=motion_text,
+            )
+            if content_result.available:
+                content_score = float(content_result.total)
+                content_feedback = content_result.feedback
+                logger.info(
+                    stage_log(
+                        "content_scoring_done",
+                        "",
+                        total=content_result.total,
+                        relevance=content_result.relevance,
+                        arguments=content_result.arguments,
+                    )
+                )
+            else:
+                content_feedback = content_result.error or "Content scoring unavailable"
+        except Exception as exc:
+            logger.warning(f"Content scoring failed: {type(exc).__name__}: {exc}")
+            content_feedback = f"Content scoring error: {type(exc).__name__}"
+
+    # Build breakdown dict
+    breakdown = {
+        "pronunciation": {
+            "raw": pron_raw,
+            "weighted": round(pron_score, 2) if pron_score else None,
+            "weight": "25%",
+        },
+        "fluency": {
+            "raw": clarity_raw,
+            "weighted": round(fluency_score, 2) if fluency_score else None,
+            "weight": "25%",
+        },
+        "content": {
+            "total": content_score,
+            "weight": "50%",
+            "feedback": content_feedback,
+            "details": content_result.to_dict() if content_result else None,
+        },
+    }
+
+    # Calculate final score
+    available_scores = []
+    if pron_score is not None:
+        available_scores.append(pron_score)
+    if fluency_score is not None:
+        available_scores.append(fluency_score)
+    if content_score is not None:
+        available_scores.append(content_score)
+
+    if not available_scores:
+        return 0.0, True, breakdown
+
+    # Sum available scores (max possible = 100 if all available)
+    # If content unavailable, scale up other scores proportionally
+    final_score = sum(available_scores)
+    
+    # If content scoring failed, rescale pronunciation+fluency to 100
+    if content_score is None and (pron_score is not None or fluency_score is not None):
+        # Only pron+fluency available (max 50) -> scale to 100
+        final_score = final_score * 2.0
+
+    final_score = round(max(0.0, min(100.0, final_score)), 2)
+    scoring_unavailable = len(available_scores) == 0
+
+    breakdown["final_score"] = final_score
+    breakdown["scoring_unavailable"] = scoring_unavailable
+
+    return final_score, scoring_unavailable, breakdown

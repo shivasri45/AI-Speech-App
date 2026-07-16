@@ -185,6 +185,9 @@ async def upload_turn(
         ai_score=turn.ai_score,
         scoring_unavailable=turn.scoring_unavailable,
         analysis_id=turn.analysis_id,
+        content_score=turn.content_score,
+        content_feedback=turn.content_feedback,
+        score_breakdown=turn.score_breakdown,
         state=to_public(updated_room),
     )
 

@@ -3,23 +3,32 @@ import {
   ArrowLeft,
   BarChart3,
   ClipboardList,
+  Download,
+  HardDrive,
   LayoutDashboard,
   MessagesSquare,
   Trophy,
   Users,
+  Users2,
 } from "lucide-react";
 import { AdminPendingView } from "./admin/AdminPendingView";
 import { AdminStudentsView } from "./admin/AdminStudentsView";
 import { AdminAnalyticsView } from "./admin/AdminAnalyticsView";
 import { AdminLeaderboardView } from "./admin/AdminLeaderboardView";
 import { PendingDebatesList } from "./admin/debates/PendingDebatesList";
+import { PendingGDList } from "./admin/gd/PendingGDList";
+import { ExportReports } from "./admin/ExportReports";
+import { StorageStats } from "./admin/StorageStats";
 
 type AdminTab =
   | "pending"
   | "students"
   | "analytics"
   | "leaderboard"
-  | "debates";
+  | "debates"
+  | "gd"
+  | "exports"
+  | "storage";
 
 interface AdminPanelViewProps {
   onBack: () => void;
@@ -36,7 +45,10 @@ const TABS: Array<{
   { id: "students", label: "Students", icon: Users },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "leaderboard", label: "Leaderboard", icon: Trophy },
-  { id: "debates", label: "Pending Debates", icon: MessagesSquare },
+  { id: "debates", label: "Debates", icon: MessagesSquare },
+  { id: "gd", label: "Group Discussions", icon: Users2 },
+  { id: "exports", label: "Exports", icon: Download },
+  { id: "storage", label: "Storage", icon: HardDrive },
 ];
 
 export function AdminPanelView({
@@ -122,6 +134,11 @@ export function AdminPanelView({
         {active === "analytics" && <AdminAnalyticsView />}
         {active === "leaderboard" && <AdminLeaderboardView />}
         {active === "debates" && <PendingDebatesList />}
+        {active === "gd" && (
+          <PendingGDList onOpenSession={(id) => console.log("Open GD:", id)} />
+        )}
+        {active === "exports" && <ExportReports />}
+        {active === "storage" && <StorageStats />}
       </div>
     </div>
   );
