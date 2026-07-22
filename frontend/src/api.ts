@@ -148,7 +148,7 @@ export async function scoreAudio(
       const heardDiffers = !!heardRaw && heardRaw.toLowerCase() !== expectedLc;
       const score = typeof w.score === "number" ? w.score : undefined;
       const correct = pronunciationAvailable
-        ? (score ?? 0) >= 70
+        ? (score ?? 0) >= 80  // Stricter: was 70, now 80 to be "correct"
         : !mistakeMap.has(expectedLc);
       return {
         word: w.word,

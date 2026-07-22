@@ -1,0 +1,27 @@
+[Unit]
+Description=Soft Skills FastAPI Backend
+After=network.target softskills-ss3.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/softskills
+Environment="PATH=/home/ubuntu/softskills/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/softskills/.firebase-admin.json"
+Environment="GROQ_API_KEY=YOUR_GROQ_API_KEY_HERE"
+Environment="PRONUNCIATION_PROVIDER=hf_phoneme"
+Environment="HF_PHONEME_MODEL_NAME=facebook/wav2vec2-lv-60-espeak-cv-ft"
+Environment="AUTH_BYPASS=false"
+Environment="UPLOAD_DIR=uploads"
+Environment="OUTPUT_DIR=outputs"
+Environment="TEMP_DIR=temp"
+Environment="CSA_SERVICE_URL=http://127.0.0.1:8001"
+Environment="CSA_DATA_DIR=/home/ubuntu/softskills/outputs/ss3"
+Environment="CSA_ANALYZE_TIMEOUT_SECONDS=180"
+Environment="TEACHER_EMAILS=aviral.2428cse967@kiet.edu"
+ExecStart=/home/ubuntu/softskills/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

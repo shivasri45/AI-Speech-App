@@ -1,8 +1,8 @@
 # Caddy reverse-proxy config for the soft-skills platform.
 #
 # Two modes:
-#   - Local dev / IP-based testing: replace `softskills.kiet.edu` with
-#     `:80` and Caddy serves plain HTTP without trying Let's Encrypt.
+#   - Local dev / IP-based testing: use `15-207-74-56.nip.io` (wildcard DNS)
+#     and Caddy auto-provisions TLS via Let's Encrypt.
 #   - Real deployment: keep the hostname. Caddy auto-provisions TLS via
 #     Let's Encrypt as soon as the DNS A record points to this server.
 #
@@ -14,7 +14,43 @@
     email admin@kiet.edu
 }
 
-# Replace with the real domain before deploying.
+# nip.io domain for current deployment
+15-207-74-56.nip.io {
+    encode zstd gzip
+
+    # WebSocket upgrade pass-through for the battle/debate/gd endpoints.
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websockets app:8080
+
+    # Everything else: HTTP → backend.
+    reverse_proxy app:8080 {
+        # Keep upstream-aware of the original protocol so FastAPI can
+        # build correct redirect URLs when behind TLS.
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote}
+    }
+
+    # Common security headers. Adjust CSP later when you know all
+    # third-party origins (Firebase, Google APIs) at runtime.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Don't leak internal server info.
+        -Server
+    }
+
+    # Sensible log file (keeps Caddy quiet inside the container otherwise).
+    log {
+        output stdout
+        format console
+    }
+}
+
+# Keep the original domain for future use
 softskills.kiet.edu {
     encode zstd gzip
 

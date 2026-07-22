@@ -3,6 +3,8 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   type User as FirebaseUser,
 } from "firebase/auth";
@@ -15,6 +17,29 @@ import type { AuthUser } from "../types";
 
 const BYPASS_STORAGE_KEY = "softskills.auth.bypassUser";
 export const ALLOWED_DOMAIN = "kiet.edu";
+
+// ---------------------------------------------------------------------------
+// Mobile detection — used to choose redirect vs popup for Google sign-in.
+// Popups are unreliable on mobile browsers (especially iOS Safari, in-app
+// browsers like Instagram/Facebook/LinkedIn).
+// ---------------------------------------------------------------------------
+
+function isMobileOrInAppBrowser(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+  const ua = navigator.userAgent || "";
+  // Check for mobile devices
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  // Check for in-app browsers (Instagram, Facebook, LinkedIn, etc.)
+  const isInAppBrowser = /FBAN|FBAV|Instagram|LinkedIn|Twitter|Snapchat|Line|WeChat|MicroMessenger/i.test(ua);
+  // iOS WebView detection
+  const isIOSWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(ua);
+  // Check for standalone PWA mode
+  const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches;
+  
+  return isMobile || isInAppBrowser || isIOSWebView || isStandalone;
+}
 
 // ---------------------------------------------------------------------------
 // Bypass mode storage (used when VITE_AUTH_BYPASS=true OR Firebase isn't
@@ -142,6 +167,20 @@ export function useAuth(): UseAuth {
       setLoading(false);
       return;
     }
+    
+    // Handle redirect result (for mobile sign-in flow)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          // User successfully signed in via redirect
+          // onAuthStateChanged will handle the rest
+          console.log("Redirect sign-in successful");
+        }
+      })
+      .catch((err) => {
+        console.warn("Redirect sign-in error:", err);
+      });
+    
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       fbUserRef.current = fbUser;
       if (!fbUser) {
@@ -238,23 +277,37 @@ export function useAuth(): UseAuth {
     const provider = new GoogleAuthProvider();
     // Domain hint removed — any Gmail allowed now
     // provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
+    
+    // Use redirect on mobile/in-app browsers where popups are unreliable
+    const useMobileFlow = isMobileOrInAppBrowser();
+    
     try {
-      await signInWithPopup(auth, provider);
-      // Domain restriction temporarily disabled — any Gmail user allowed
-      // const email = (result.user.email ?? "").toLowerCase();
-      // if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
-      //   await firebaseSignOut(auth);
-      //   return {
-      //     ok: false,
-      //     error: `Only @${ALLOWED_DOMAIN} Google accounts can sign in.`,
-      //   };
-      // }
-      // onAuthStateChanged will set the user state.
-      return { ok: true };
+      if (useMobileFlow) {
+        // Redirect flow for mobile — this will navigate away from the page
+        // and return via getRedirectResult() handled in the useEffect above
+        await signInWithRedirect(auth, provider);
+        // This line won't execute until redirect completes
+        return { ok: true };
+      } else {
+        // Popup flow for desktop browsers
+        await signInWithPopup(auth, provider);
+        // onAuthStateChanged will set the user state.
+        return { ok: true };
+      }
     } catch (err) {
       const code = (err as { code?: string })?.code ?? "unknown";
       if (code === "auth/popup-closed-by-user") {
         return { ok: false, error: "Sign-in cancelled." };
+      }
+      if (code === "auth/popup-blocked") {
+        // Popup was blocked — try redirect as fallback
+        try {
+          await signInWithRedirect(auth, provider);
+          return { ok: true };
+        } catch (redirectErr) {
+          const message = redirectErr instanceof Error ? redirectErr.message : "Sign-in failed.";
+          return { ok: false, error: message };
+        }
       }
       const message = err instanceof Error ? err.message : "Sign-in failed.";
       return { ok: false, error: message };

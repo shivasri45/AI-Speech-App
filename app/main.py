@@ -19,15 +19,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Enable CORS for Vercel frontend + ngrok + local dev
+# Enable CORS for Vercel frontend + ngrok + local dev + nip.io
+# NOTE: FastAPI CORSMiddleware doesn't support wildcards like "https://*.vercel.app"
+# Use allow_origin_regex for pattern matching instead
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Local Vite dev
-        "https://*.vercel.app",   # Vercel preview + production
-        "https://*.ngrok-free.app",  # ngrok tunnel
-        "https://*.ngrok.io",     # ngrok alternate domain
+        "http://localhost:5173",   # Local Vite dev
+        "http://localhost:8080",   # Local backend served frontend
+        "http://127.0.0.1:5173",   # Local Vite dev (alternate)
+        "http://127.0.0.1:8080",   # Local backend (alternate)
     ],
+    # Regex patterns for dynamic subdomains (Vercel previews, ngrok tunnels, nip.io)
+    allow_origin_regex=r"https?://.*\.(vercel\.app|ngrok-free\.app|ngrok\.io|fly\.dev|nip\.io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

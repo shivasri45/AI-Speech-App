@@ -150,12 +150,10 @@ def _split_observed_per_word(
 def _weighted_word_similarity(expected: List[str], observed: List[str]) -> float:
     """
     Per-word similarity that penalizes deletions and substitutions
-    more than insertions. Insertions are common when the alignment
-    pulls extra "between-word" sounds into a word, and they should
-    not punish a correctly spoken word as harshly as a missing
-    phoneme.
+    MORE HARSHLY than insertions. Wrong phonemes should result in
+    significantly lower scores.
 
-    Insertion cost = 0.5, deletion = 1.0, substitution = 1.0.
+    Insertion cost = 0.3, deletion = 1.2, substitution = 1.5.
     Result is in [0, 1].
     """
 
@@ -163,25 +161,30 @@ def _weighted_word_similarity(expected: List[str], observed: List[str]) -> float
         return 1.0
     if not expected:
         return 0.0
+    if not observed:
+        # No phonemes heard at all - very bad
+        return 0.0
 
     rows = len(expected) + 1
     cols = len(observed) + 1
     distance = [[0.0] * cols for _ in range(rows)]
     for row in range(rows):
-        distance[row][0] = float(row)  # deletions: 1.0 each
+        distance[row][0] = float(row) * 1.2  # deletions: 1.2 each (harsh)
     for col in range(cols):
-        distance[0][col] = col * 0.5  # insertions: 0.5 each
+        distance[0][col] = col * 0.3  # insertions: 0.3 each (lenient)
 
     for row in range(1, rows):
         for col in range(1, cols):
-            cost = 0.0 if expected[row - 1] == observed[col - 1] else 1.0
+            cost = 0.0 if expected[row - 1] == observed[col - 1] else 1.5  # substitution: 1.5 (harsh)
             distance[row][col] = min(
-                distance[row - 1][col] + 1.0,      # deletion
-                distance[row][col - 1] + 0.5,      # insertion
+                distance[row - 1][col] + 1.2,      # deletion
+                distance[row][col - 1] + 0.3,      # insertion
                 distance[row - 1][col - 1] + cost, # match or sub
             )
 
-    return max(0.0, 1.0 - distance[-1][-1] / len(expected))
+    # Normalize by expected length with harsher penalty
+    max_cost = len(expected) * 1.2  # max is all deletions
+    return max(0.0, 1.0 - distance[-1][-1] / max_cost)
 
 
 def _score_word(
@@ -194,7 +197,7 @@ def _score_word(
     score = round(similarity * 100, 2)
 
     errors: List[PhonemeError] = []
-    if score < 70 and observed:
+    if score < 80 and observed:
         errors.append(
             PhonemeError(
                 type="phoneme_mismatch",
@@ -207,14 +210,17 @@ def _score_word(
             )
         )
 
-    if score >= 85:
+    # Stricter feedback thresholds
+    if score >= 90:
+        feedback = "Excellent pronunciation!"
+    elif score >= 80:
         feedback = "Good pronunciation."
-    elif score >= 70:
-        feedback = "Understandable. Practice for clarity."
-    elif score >= 40:
-        feedback = "Several sounds unclear. Slow down and repeat."
+    elif score >= 65:
+        feedback = "Understandable but needs improvement."
+    elif score >= 45:
+        feedback = "Several sounds unclear. Practice slowly."
     else:
-        feedback = "Sounds very different from the expected word."
+        feedback = "Word pronounced incorrectly. Focus on this word."
 
     return score, errors, feedback
 
@@ -300,6 +306,7 @@ class HFPhonemePronunciationProvider:
         word_results: List[WordPronunciationResult] = []
         phoneme_errors: List[PhonemeError] = []
         scored_values: List[float] = []
+        word_weights: List[float] = []  # Weight per word for overall calculation
 
         for index, word_data in enumerate(expected_per_word):
             obs = observed_per_word[index] if index < len(observed_per_word) else []
@@ -324,13 +331,34 @@ class HFPhonemePronunciationProvider:
 
             if score is not None:
                 scored_values.append(score)
+                # Wrong words get MORE weight in the overall calculation
+                # This makes a single wrong word hurt the score more
+                if score < 70:
+                    word_weights.append(1.5)  # Wrong words count 1.5x
+                elif score < 85:
+                    word_weights.append(1.2)  # Weak words count 1.2x
+                else:
+                    word_weights.append(1.0)  # Good words count 1x
 
-        expected_flat: List[str] = []
-        for word_data in expected_per_word:
-            expected_flat.extend(word_data["phonemes"])
-
-        overall_similarity = edit_distance_similarity(expected_flat, observed_arpabet)
-        overall_score = round(overall_similarity * 100, 2) if expected_flat else None
+        # Calculate overall score with weighted average that penalizes mistakes more
+        if scored_values and word_weights:
+            total_weight = sum(word_weights)
+            # Weighted average where bad words pull down the score more
+            weighted_sum = sum(s * w for s, w in zip(scored_values, word_weights))
+            overall_score = round(weighted_sum / total_weight, 2)
+            
+            # Additional penalty for short sentences with mistakes
+            # In a 2-word sentence, 1 mistake should hurt more than in a 10-word sentence
+            num_words = len(scored_values)
+            num_wrong = sum(1 for s in scored_values if s < 70)
+            if num_words <= 5 and num_wrong > 0:
+                # Apply extra penalty: up to 15 points for short sentences
+                wrong_ratio = num_wrong / num_words
+                extra_penalty = wrong_ratio * 15 * (6 - num_words) / 5  # scales with sentence shortness
+                overall_score = max(0, overall_score - extra_penalty)
+                overall_score = round(overall_score, 2)
+        else:
+            overall_score = None
 
         return PronunciationResult(
             available=True,

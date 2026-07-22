@@ -18,15 +18,17 @@ interface ReportViewProps {
 }
 
 function verdictFor(score: number): { label: string; tone: string } {
+  // Stricter thresholds - "Good" requires 80+, not 70
   if (score >= 90) return { label: "Excellent", tone: "text-emerald-300" };
-  if (score >= 70) return { label: "Good", tone: "text-sky-300" };
-  if (score >= 50) return { label: "Keep practicing", tone: "text-amber-300" };
+  if (score >= 80) return { label: "Good", tone: "text-sky-300" };
+  if (score >= 65) return { label: "Fair", tone: "text-amber-300" };
+  if (score >= 50) return { label: "Keep practicing", tone: "text-orange-300" };
   return { label: "Needs work", tone: "text-rose-300" };
 }
 
 function deriveTips(report: ScoreResult): string[] {
   const tips: string[] = [];
-  if (report.score < 50) {
+  if (report.score < 60) {
     tips.push("Slow down and pronounce each consonant clearly.");
   }
   if (report.wpm > 200) {
@@ -35,7 +37,7 @@ function deriveTips(report: ScoreResult): string[] {
     tips.push("Try to speak more fluidly — aim for 130-160 wpm.");
   }
   const weakWords = report.wordResults
-    .filter((w) => typeof w.score === "number" && w.score < 70)
+    .filter((w) => typeof w.score === "number" && w.score < 80)  // Stricter: was 70
     .sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
     .slice(0, 3)
     .map((w) => w.word);
