@@ -55,6 +55,14 @@ interface DebateTurn {
   scoring_unavailable: boolean;
   teacher_override_score: number | null;
   teacher_comment: string | null;
+  content_score: number | null;
+  content_feedback: string | null;
+  score_breakdown: {
+    pronunciation?: { raw: number | null; weighted: number | null; weight: string };
+    fluency?: { raw: number | null; weighted: number | null; weight: string };
+    content?: { total: number | null; weight: string; feedback: string };
+    final_score?: number;
+  } | null;
   submitted_at: number;
   forfeit_reason: "timeout" | "reconnect_timeout" | null;
 }
@@ -462,6 +470,42 @@ export function DebateReviewPanel({
                         </div>
                       </div>
                     </div>
+
+                    {/* Score breakdown */}
+                    {turn.score_breakdown && (
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-zinc-800/50 rounded-lg p-2">
+                          <div className="text-zinc-400">Pronunciation</div>
+                          <div className="text-zinc-100 font-semibold">
+                            {turn.score_breakdown.pronunciation?.weighted?.toFixed(1) ?? "N/A"}/25
+                          </div>
+                        </div>
+                        <div className="bg-zinc-800/50 rounded-lg p-2">
+                          <div className="text-zinc-400">Fluency</div>
+                          <div className="text-zinc-100 font-semibold">
+                            {turn.score_breakdown.fluency?.weighted?.toFixed(1) ?? "N/A"}/25
+                          </div>
+                        </div>
+                        <div className="bg-zinc-800/50 rounded-lg p-2">
+                          <div className="text-zinc-400">Content</div>
+                          <div className="text-zinc-100 font-semibold">
+                            {turn.content_score?.toFixed(1) ?? "N/A"}/50
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Content Feedback */}
+                    {turn.content_feedback && (
+                      <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-widest text-violet-300 font-semibold mb-1">
+                          AI Feedback
+                        </div>
+                        <p className="text-sm text-zinc-300 leading-relaxed">
+                          {turn.content_feedback}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-[8rem_1fr_auto] gap-3 items-start">
                       <div>

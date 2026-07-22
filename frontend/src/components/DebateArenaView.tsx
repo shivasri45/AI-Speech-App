@@ -162,10 +162,8 @@ function PausedOverlay({
 
 function CompletedTurnsAudio({
   completedTurns,
-  roomCode,
 }: {
   completedTurns: CompletedTurnPublic[];
-  roomCode: string;
 }) {
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1110,7 +1108,6 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
         {state?.completed_turns && state.completed_turns.length > 0 && (
           <CompletedTurnsAudio
             completedTurns={state.completed_turns}
-            roomCode={roomCode || ""}
           />
         )}
       </section>
