@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import random
 import secrets
 import time
@@ -68,7 +69,10 @@ PREP_SECONDS = 60
 TURN_SECONDS = 120
 TURN_GRACE_SECONDS = 15
 RECONNECT_GRACE_SECONDS = 30
-MIN_PARTICIPANTS = 4
+
+# Dev mode allows single-player testing (set DEBATE_DEV_MODE=true in .env)
+_DEV_MODE = os.getenv("DEBATE_DEV_MODE", "").lower() in ("true", "1", "yes")
+MIN_PARTICIPANTS = 1 if _DEV_MODE else 4
 MAX_PARTICIPANTS = 6
 GC_TTL_SECONDS = 60 * 60
 

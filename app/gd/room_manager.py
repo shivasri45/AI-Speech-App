@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import random
 import secrets
 import time
@@ -35,7 +36,11 @@ ROOM_CODE_LENGTH = 6
 
 PREP_SECONDS = 120  # 2 minutes prep after all ready
 DISCUSSION_SECONDS = 900  # 15 minutes discussion
-MIN_PARTICIPANTS = 5
+
+# Dev mode allows single-player testing (set GD_DEV_MODE=true in .env)
+_DEV_MODE = os.getenv("GD_DEV_MODE", "").lower() in ("true", "1", "yes")
+MIN_PARTICIPANTS = 1 if _DEV_MODE else 5
+
 MAX_PARTICIPANTS = 10
 GC_TTL_SECONDS = 60 * 60
 MIN_SPEECH_DURATION = 2.0  # seconds
