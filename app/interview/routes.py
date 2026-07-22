@@ -23,8 +23,6 @@ from pydantic import Field
 
 from app.auth import User
 from app.auth import require_user
-from app.storage import submissions as submissions_store
-
 from app.storage import reviews_store
 from app.storage import submissions_store
 
@@ -43,24 +41,6 @@ router = APIRouter(prefix="/interview", tags=["interview"])
 
 
 _MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB — webm @ 720p easily fits
-
-
-class SubmitForReviewRequest(BaseModel):
-    """Payload from the student after they've seen their gesture scores
-    and want a teacher to grade the content too."""
-
-    question_id: str
-    question_prompt: str
-    question_category: str = "general"
-    gesture_session_id: str | None = None
-    gesture_score: int = 0
-    gesture_metrics: list[dict] = Field(default_factory=list)
-    duration_seconds: float = 0.0
-
-
-class SubmitForReviewResponse(BaseModel):
-    submission_id: str
-    status: str
 
 
 @router.post("/analyze", response_model=InterviewAnalysisResponse)
@@ -176,39 +156,6 @@ async def my_submission_detail(
         )
     review = reviews_store.get_for_submission(submission_id)
     return MySubmissionDetail(submission=submission, review=review)
-
-
-@router.post("/submissions", response_model=SubmitForReviewResponse)
-async def submit_for_review(
-    body: SubmitForReviewRequest,
-    current_user: User = Depends(require_user),
-) -> SubmitForReviewResponse:
-    """Persist the student's interview attempt for teacher review.
-
-    Called from the frontend after the AI gesture-analysis stage. The
-    teacher's queue (`/admin/submissions/pending`) picks it up next.
-    """
-    submission = submissions_store.create(
-        student_email=current_user.email,
-        student_uid=current_user.uid,
-        student_name=current_user.name or "",
-        question_id=body.question_id,
-        question_prompt=body.question_prompt,
-        question_category=body.question_category,
-        gesture_session_id=body.gesture_session_id,
-        gesture_score=int(body.gesture_score or 0),
-        gesture_metrics=body.gesture_metrics,
-        duration_seconds=float(body.duration_seconds or 0.0),
-    )
-    logger.info(
-        "interview_submission created id=%s student=%s",
-        submission.submission_id,
-        current_user.email,
-    )
-    return SubmitForReviewResponse(
-        submission_id=submission.submission_id,
-        status=submission.status,
-    )
 
 
 # ---------------------------------------------------------------------------
