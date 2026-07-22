@@ -101,10 +101,12 @@ function PlayerScoreCard({
   );
 }
 
-function bannerCopy(verdict: RoomState["verdict"], youAre: PlayerRole) {
-  if (!verdict) return { title: "Round Complete", tone: "neutral" as const };
-  if (verdict.winner === "draw") return { title: "It's a Draw", tone: "neutral" as const };
-  if (verdict.winner === youAre) return { title: "You Win", tone: "win" as const };
+type MatchOutcome = "host" | "opponent" | "draw" | null;
+
+function bannerCopy(winner: MatchOutcome, youAre: PlayerRole) {
+  if (!winner) return { title: "Match Complete", tone: "neutral" as const };
+  if (winner === "draw") return { title: "It's a Draw", tone: "neutral" as const };
+  if (winner === youAre) return { title: "You Win", tone: "win" as const };
   return { title: "Opponent Wins", tone: "loss" as const };
 }
 
@@ -117,7 +119,17 @@ export function BattleResultView({
   const { verdict } = state;
   const hostScore = state.scores?.host ?? null;
   const oppScore = state.scores?.opponent ?? null;
-  const banner = bannerCopy(verdict, youAre);
+
+  const isMultiRound = (state.total_rounds ?? 1) > 1;
+  const matchWinner: MatchOutcome = isMultiRound
+    ? state.match_winner ?? null
+    : verdict?.winner ?? null;
+  const banner = bannerCopy(matchWinner, youAre);
+
+  const yourRoundsWon =
+    youAre === "host" ? state.host_rounds_won ?? 0 : state.opponent_rounds_won ?? 0;
+  const oppRoundsWon =
+    youAre === "host" ? state.opponent_rounds_won ?? 0 : state.host_rounds_won ?? 0;
 
   const toneClasses = {
     win: "from-emerald-400 via-emerald-300 to-emerald-200",
@@ -143,17 +155,74 @@ export function BattleResultView({
           >
             {banner.title}
           </h1>
-          {verdict && (
+          {isMultiRound ? (
             <div className="text-sm text-zinc-400">
-              {verdict.host_stars} – {verdict.opponent_stars}{" "}
-              <span className="text-zinc-600">stars</span>
+              Rounds won:{" "}
+              <span className="text-emerald-300 font-semibold">{yourRoundsWon}</span>
+              {" – "}
+              <span className="text-rose-300 font-semibold">{oppRoundsWon}</span>
+              <span className="text-zinc-600">
+                {" "}
+                (best of {state.total_rounds})
+              </span>
             </div>
+          ) : (
+            verdict && (
+              <div className="text-sm text-zinc-400">
+                {verdict.host_stars} – {verdict.opponent_stars}{" "}
+                <span className="text-zinc-600">stars</span>
+              </div>
+            )
           )}
         </div>
       </section>
 
+      {isMultiRound && state.round_history.length > 0 && (
+        <section className="card-glass p-6 md:p-8">
+          <h3 className="text-lg font-bold text-zinc-100 tracking-tight mb-4">
+            Round-by-Round
+          </h3>
+          <div className="space-y-2">
+            {state.round_history.map((r) => {
+              const youWon = r.verdict.winner === youAre;
+              const draw = r.verdict.winner === "draw";
+              return (
+                <div
+                  key={r.round_number}
+                  className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2.5"
+                >
+                  <span className="text-xs font-mono text-zinc-500 w-14 shrink-0">
+                    R{r.round_number}
+                  </span>
+                  <span className="flex-1 min-w-0 text-sm text-zinc-300 truncate">
+                    {r.prompt.text}
+                  </span>
+                  <span
+                    className={[
+                      "text-xs font-semibold px-2 py-0.5 rounded shrink-0",
+                      draw
+                        ? "bg-zinc-700/50 text-zinc-300"
+                        : youWon
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-rose-500/15 text-rose-300",
+                    ].join(" ")}
+                  >
+                    {draw ? "Draw" : youWon ? "Won" : "Lost"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {verdict && (
         <section className="card-glass p-6 md:p-8">
+          {isMultiRound && (
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-3">
+              Final round breakdown
+            </div>
+          )}
           <StarRow
             perspective={youAre}
             pronunciation={verdict.pronunciation}

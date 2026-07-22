@@ -39,6 +39,7 @@ from app.debate.schemas import (
     DebateRoom,
     DebateTurn,
     EffectiveScoreEntry,
+    FinalStanding,
     Motion,
     ParticipantInternal,
     PublicDebateRoom,
@@ -888,6 +889,36 @@ class DebateRoomManager:
                     effective_score=compute_effective_score(t),
                 )
             )
+
+        # Build ranked standings for the completion screen. Order matches
+        # compute_winner's cascade: effective_score DESC, then submitted_at
+        # ASC, turn_index ASC, participant_id ASC as deterministic tiebreaks.
+        display_by_pid = {p.participant_id: p.display_name for p in room.participants}
+        forfeit_by_pid = {p.participant_id: p.is_forfeit for p in room.participants}
+        ranked = sorted(
+            (turn_by_pid[p.participant_id] for p in room.participants
+             if p.participant_id in turn_by_pid),
+            key=lambda t: (
+                -compute_effective_score(t),
+                t.submitted_at,
+                t.turn_index,
+                t.participant_id,
+            ),
+        )
+        room.final_standings = [
+            FinalStanding(
+                participant_id=t.participant_id,
+                display_name=display_by_pid.get(t.participant_id, "Speaker"),
+                rank=idx + 1,
+                ai_score=round(float(t.ai_score), 1),
+                content_score=t.content_score,
+                content_feedback=t.content_feedback,
+                effective_score=round(compute_effective_score(t), 1),
+                is_forfeit=forfeit_by_pid.get(t.participant_id, False),
+                is_winner=(t.participant_id == winner_id),
+            )
+            for idx, t in enumerate(ranked)
+        ]
 
         record = DebateRecord(
             debate_id=room.debate_id,

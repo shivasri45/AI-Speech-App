@@ -24,8 +24,10 @@ from fastapi import WebSocket
 
 from .schemas import BattlePrompt
 from .schemas import BattleRoomState
+from .schemas import BattleScores
 from .schemas import PlayerScore
 from .schemas import PlayerRole
+from .schemas import RoundResult
 from .schemas import WSInbound
 from .schemas import WSOutbound
 from .schemas import serialize
@@ -95,8 +97,20 @@ class RoomManager:
     # Room lifecycle
     # ------------------------------------------------------------------
 
-    async def create_room(self, host_name: str, prompt: BattlePrompt) -> Tuple[str, str]:
-        """Create a new room with a unique code and return (code, host_player_id)."""
+    async def create_room(
+        self,
+        host_name: str,
+        prompts: list[BattlePrompt],
+        total_rounds: int = 1,
+    ) -> Tuple[str, str]:
+        """Create a new room with a unique code and return (code, host_player_id).
+
+        `prompts` holds one prompt per round (length == total_rounds). The
+        room starts on round 1 with `prompt` mirroring `prompts[0]`.
+        """
+        if not prompts:
+            raise ValueError("at least one prompt is required")
+        total_rounds = max(1, min(total_rounds, len(prompts)))
         async with self._manager_lock:
             self._sweep_stale()
             # Retry on collision. The space is ~10^9 codes, so this is
@@ -113,7 +127,10 @@ class RoomManager:
                 status="waiting",
                 host_name=host_name,
                 host_player_id=host_player_id,
-                prompt=prompt,
+                prompt=prompts[0],
+                prompts=prompts,
+                total_rounds=total_rounds,
+                current_round=1,
             )
             self._rooms[code] = state
             self._locks[code] = asyncio.Lock()
@@ -260,26 +277,87 @@ class RoomManager:
                 compute_now = True
         await self.broadcast(room_code)
         if compute_now:
-            await self._finalize(room_code)
+            await self._finalize_round(room_code)
 
-    async def _finalize(self, room_code: str) -> None:
+    async def _finalize_round(self, room_code: str) -> None:
+        """Score the current round, record it, then either advance to the
+        next round (status → ``ready``) or end the match (status →
+        ``complete``). Missing scores default to zeros.
+        """
         async with self._lock_for(room_code):
             room = self._rooms.get(room_code)
             if room is None:
                 return
+            # Guard against double-finalizing the same round.
+            if room.status not in ("recording", "scoring"):
+                return
+
             host_score = room.scores.host or zero_score()
             opp_score = room.scores.opponent or zero_score()
-            room.scores.host = host_score
-            room.scores.opponent = opp_score
-            room.verdict = compute_stars(host_score, opp_score)
-            room.status = "complete"
-            room.phase_deadline = None
-            room.closed_at = time.time()
+            verdict = compute_stars(host_score, opp_score)
+
+            round_prompt = room.prompt or (
+                room.prompts[room.current_round - 1]
+                if room.current_round - 1 < len(room.prompts)
+                else None
+            )
+            if round_prompt is not None:
+                room.round_history.append(
+                    RoundResult(
+                        round_number=room.current_round,
+                        prompt=round_prompt,
+                        host_score=host_score,
+                        opponent_score=opp_score,
+                        verdict=verdict,
+                    )
+                )
+
+            # Tally the round winner.
+            if verdict.winner == "host":
+                room.host_rounds_won += 1
+            elif verdict.winner == "opponent":
+                room.opponent_rounds_won += 1
+            # A round "draw" adds to neither tally.
+
+            majority = room.total_rounds // 2 + 1
+            clinched = (
+                room.host_rounds_won >= majority
+                or room.opponent_rounds_won >= majority
+            )
+            is_last_round = room.current_round >= room.total_rounds
+
+            if clinched or is_last_round:
+                # Match over.
+                room.scores.host = host_score
+                room.scores.opponent = opp_score
+                room.verdict = verdict
+                if room.host_rounds_won > room.opponent_rounds_won:
+                    room.match_winner = "host"
+                elif room.opponent_rounds_won > room.host_rounds_won:
+                    room.match_winner = "opponent"
+                else:
+                    room.match_winner = "draw"
+                room.status = "complete"
+                room.phase_deadline = None
+                room.closed_at = time.time()
+                should_cancel_task = True
+            else:
+                # Advance to the next round; players re-ready.
+                room.current_round += 1
+                room.prompt = room.prompts[room.current_round - 1]
+                room.scores = BattleScores()
+                room.host_ready = False
+                room.opponent_ready = False
+                room.verdict = None
+                room.status = "ready"
+                room.phase_deadline = None
+                should_cancel_task = True
+
         await self.broadcast(room_code)
-        # Drop any pending task — the round is over.
-        task = self._tasks.pop(room_code, None)
-        if task is not None and not task.done():
-            task.cancel()
+        if should_cancel_task:
+            task = self._tasks.pop(room_code, None)
+            if task is not None and not task.done():
+                task.cancel()
 
     async def abandon(self, room_code: str, reason: str) -> None:
         async with self._lock_for(room_code):
@@ -337,7 +415,7 @@ class RoomManager:
             return
         if room.status in ("complete", "abandoned"):
             return
-        await self._finalize(room_code)
+        await self._finalize_round(room_code)
 
 
 # Module-level singleton — imported by routes and any future helpers.

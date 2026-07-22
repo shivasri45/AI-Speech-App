@@ -25,6 +25,18 @@ export interface ParticipantPublic {
   is_forfeit: boolean;
 }
 
+export interface FinalStanding {
+  participant_id: string;
+  display_name: string;
+  rank: number;
+  ai_score: number;
+  content_score: number | null;
+  content_feedback: string | null;
+  effective_score: number;
+  is_forfeit: boolean;
+  is_winner: boolean;
+}
+
 export interface PublicDebateRoom {
   code: string;
   state: DebateState;
@@ -36,6 +48,7 @@ export interface PublicDebateRoom {
   turn_deadline: number | null;
   reconnect_deadline: number | null;
   winner_participant_id: string | null;
+  final_standings: FinalStanding[];
 }
 
 export interface CreateRoomResponse {

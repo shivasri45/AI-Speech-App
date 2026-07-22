@@ -187,13 +187,17 @@ export function BattleRoomView({
   }, []);
 
   // Reset per-round state when status moves back to a pre-record phase.
+  // Clearing the recorder is essential so round 2+ can auto-start recording
+  // (the auto-start effect bails out if a previous round's blob lingers).
   useEffect(() => {
     if (!state) return;
     if (state.status === "waiting" || state.status === "ready") {
       setScoreSubmitted(false);
       setSubmitError(null);
       autoStopRef.current = false;
+      recorder.reset();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.status]);
 
   // Bubble up when the round completes.
@@ -209,6 +213,18 @@ export function BattleRoomView({
   const opponentName = state?.opponent_name ?? null;
   const youAre = role;
   const opponentRole: PlayerRole = role === "host" ? "opponent" : "host";
+
+  const totalRounds = state?.total_rounds ?? 1;
+  const currentRound = state?.current_round ?? 1;
+  const isMultiRound = totalRounds > 1;
+  const yourRoundsWon =
+    role === "host" ? state?.host_rounds_won ?? 0 : state?.opponent_rounds_won ?? 0;
+  const oppRoundsWon =
+    role === "host" ? state?.opponent_rounds_won ?? 0 : state?.host_rounds_won ?? 0;
+  const lastRound =
+    state?.round_history && state.round_history.length > 0
+      ? state.round_history[state.round_history.length - 1]
+      : null;
 
   const yourScoreSubmitted =
     !!state?.scores && !!(role === "host" ? state.scores.host : state.scores.opponent);
@@ -300,6 +316,18 @@ export function BattleRoomView({
         <span className="text-zinc-500 text-sm">
           Room <span className="font-mono text-zinc-300">{roomCode}</span>
         </span>
+        {isMultiRound && (
+          <>
+            <span className="chip bg-brand-500/10 text-brand-300 border border-brand-500/30">
+              Round {Math.min(currentRound, totalRounds)} / {totalRounds}
+            </span>
+            <span className="text-xs text-zinc-500">
+              You <span className="text-emerald-300 font-semibold">{yourRoundsWon}</span>
+              {" – "}
+              <span className="text-rose-300 font-semibold">{oppRoundsWon}</span> Opp
+            </span>
+          </>
+        )}
       </div>
       <div className="flex items-center gap-2 text-xs">
         <span className={connected ? "text-emerald-300" : "text-zinc-500"}>
@@ -381,6 +409,28 @@ export function BattleRoomView({
     const youReady = role === "host" ? state?.host_ready : state?.opponent_ready;
     content = (
       <section className="card-glass p-8 md:p-10 flex flex-col gap-6">
+        {isMultiRound && lastRound && (
+          <div
+            className={[
+              "rounded-xl border px-4 py-3 text-center text-sm font-semibold",
+              lastRound.verdict.winner === "draw"
+                ? "border-zinc-700 bg-zinc-800/40 text-zinc-300"
+                : lastRound.verdict.winner === youAre
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-500/40 bg-rose-500/10 text-rose-300",
+            ].join(" ")}
+          >
+            Round {lastRound.round_number}:{" "}
+            {lastRound.verdict.winner === "draw"
+              ? "Draw"
+              : lastRound.verdict.winner === youAre
+              ? "You won"
+              : "Opponent won"}{" "}
+            <span className="opacity-70 font-normal">
+              — get ready for round {Math.min(currentRound, totalRounds)}
+            </span>
+          </div>
+        )}
         <div className="flex flex-col items-center text-center gap-4">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">
             Read this aloud when the timer starts

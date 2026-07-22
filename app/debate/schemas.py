@@ -84,6 +84,8 @@ class DebateRoom(BaseModel):
     created_at: float
     completed_at: Optional[float] = None
     winner_participant_id: Optional[str] = None
+    # Ranked results, filled in at completion (see room_manager finalize).
+    final_standings: list["FinalStanding"] = Field(default_factory=list)
 
     # Cumulative pause offset for the currently active turn. Used when
     # resuming after a paused overlay so the turn deadline is extended by
@@ -125,6 +127,25 @@ class MotionPublic(BaseModel):
     text: str
 
 
+class FinalStanding(BaseModel):
+    """Per-participant result shown on the completion screen.
+
+    Broadcast-safe: carries no email / uid. Populated only when the room
+    reaches `complete` so players can see *why* the winner won (ranked
+    scores + content feedback), not just a name.
+    """
+
+    participant_id: str
+    display_name: str
+    rank: int  # 1-based; ties share the sort order established by compute_winner
+    ai_score: float
+    content_score: Optional[float] = None  # 0-50 from the LLM, if scored
+    content_feedback: Optional[str] = None
+    effective_score: float
+    is_forfeit: bool = False
+    is_winner: bool = False
+
+
 class PublicDebateRoom(BaseModel):
     """Broadcast shape — NEVER exposes emails, WS handles, or uids.
 
@@ -143,6 +164,9 @@ class PublicDebateRoom(BaseModel):
     turn_deadline: Optional[float] = None
     reconnect_deadline: Optional[float] = None
     winner_participant_id: Optional[str] = None
+    # Populated only at completion so the results screen can explain the
+    # outcome with ranked scores. Empty during the live debate.
+    final_standings: list[FinalStanding] = Field(default_factory=list)
 
 
 def to_public(room: DebateRoom) -> PublicDebateRoom:
@@ -177,6 +201,7 @@ def to_public(room: DebateRoom) -> PublicDebateRoom:
         turn_deadline=room.turn_deadline,
         reconnect_deadline=room.reconnect_deadline,
         winner_participant_id=room.winner_participant_id,
+        final_standings=room.final_standings,
     )
 
 

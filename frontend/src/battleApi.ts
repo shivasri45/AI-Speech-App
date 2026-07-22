@@ -44,6 +44,14 @@ export interface StarVerdict {
   opponent_stars: number;
 }
 
+export interface RoundResult {
+  round_number: number;
+  prompt: BattlePrompt;
+  host_score: PlayerScore | null;
+  opponent_score: PlayerScore | null;
+  verdict: StarVerdict;
+}
+
 export interface RoomState {
   room_code: string;
   status: BattleStatus;
@@ -56,6 +64,13 @@ export interface RoomState {
   verdict: StarVerdict | null;
   error: string | null;
   phase_deadline: number | null;
+  // --- Multi-round ---
+  total_rounds: number;
+  current_round: number;
+  round_history: RoundResult[];
+  host_rounds_won: number;
+  opponent_rounds_won: number;
+  match_winner: WinnerVerdict | null;
 }
 
 export interface CreateRoomResponse {
@@ -119,11 +134,14 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function createRoom(playerName: string): Promise<CreateRoomResponse> {
+export async function createRoom(
+  playerName: string,
+  rounds: number = 3,
+): Promise<CreateRoomResponse> {
   return fetchJson<CreateRoomResponse>("/battle/rooms", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ host_name: playerName }),
+    body: JSON.stringify({ host_name: playerName, rounds }),
   });
 }
 

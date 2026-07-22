@@ -39,7 +39,6 @@ from app.core.logging_helpers import stage_log
 from app.debate.content_scoring import score_debate_content, ContentScoreResult
 from app.fluency.schemas import FluencyResult
 from app.fluency.service import build_fluency_section
-from app.pronunciation.service import assess_pronunciation
 from app.schemas.pronunciation_schema import AnalyzeResponse
 from app.schemas.pronunciation_schema import PronunciationResult
 
@@ -105,23 +104,30 @@ async def analyze_turn_audio(
         )
     )
 
-    # Enable pronunciation assessment using transcribed text as reference.
-    # HF phoneme model can assess acoustic quality even without pre-defined
-    # expected text by using the ASR transcript as the expected baseline.
-    expected_text_for_pronunciation = transcription.text if transcription.text else None
-    
-    pronunciation = assess_pronunciation(
-        audio_path=audio_asset.processed_path,
-        expected_text=expected_text_for_pronunciation,
-        transcription=transcription,
-        analysis_id=analysis_id,
+    # NOTE: We intentionally SKIP the HF phoneme pronunciation model for
+    # debate turns. On CPU it takes 60-110s for a 1-2 minute free-form
+    # speech (whole-audio wav2vec2 inference + phoneme alignment against the
+    # full transcript). That routinely blew past the 135s turn timer, which
+    # caused the turn to be forfeited (ai_score=0) before the real score
+    # could be saved — and it made uploads feel like they hung for minutes.
+    #
+    # Debate scoring is about CONTENT and FLUENCY, not per-phoneme accuracy,
+    # so we score on fluency (clarity/pace from ASR) + LLM content only.
+    # `compute_ai_score_with_content` rescales to 0-100 when pronunciation
+    # is absent.
+    pronunciation = PronunciationResult(
+        available=False,
+        provider="skipped_for_debate",
+        overall_score=None,
+        words=[],
+        phoneme_errors=[],
+        message="Phoneme pronunciation is not scored for debate turns.",
     )
     logger.info(
         stage_log(
-            "pronunciation_done",
+            "pronunciation_skipped",
             analysis_id,
-            available=pronunciation.available,
-            overall_score=pronunciation.overall_score,
+            reason="debate_turn_speed",
         )
     )
 
@@ -309,31 +315,35 @@ async def compute_ai_score_with_content(
         },
     }
 
-    # Calculate final score
-    available_scores = []
+    # Calculate final score by summing the components that are actually
+    # available, then rescaling to 0-100 based on the maximum achievable
+    # from those same components. This keeps the score on a 0-100 scale no
+    # matter which signals are present:
+    #   - pronunciation contributes up to 25
+    #   - fluency contributes up to 25
+    #   - content contributes up to 50
+    # e.g. debate turns skip pronunciation, so max achievable = 75 and we
+    # scale the (fluency + content) sum up by 100/75.
+    earned = 0.0
+    max_possible = 0.0
     if pron_score is not None:
-        available_scores.append(pron_score)
+        earned += pron_score
+        max_possible += 25.0
     if fluency_score is not None:
-        available_scores.append(fluency_score)
+        earned += fluency_score
+        max_possible += 25.0
     if content_score is not None:
-        available_scores.append(content_score)
+        earned += content_score
+        max_possible += 50.0
 
-    if not available_scores:
+    if max_possible <= 0:
+        breakdown["final_score"] = 0.0
+        breakdown["scoring_unavailable"] = True
         return 0.0, True, breakdown
 
-    # Sum available scores (max possible = 100 if all available)
-    # If content unavailable, scale up other scores proportionally
-    final_score = sum(available_scores)
-    
-    # If content scoring failed, rescale pronunciation+fluency to 100
-    if content_score is None and (pron_score is not None or fluency_score is not None):
-        # Only pron+fluency available (max 50) -> scale to 100
-        final_score = final_score * 2.0
-
-    final_score = round(max(0.0, min(100.0, final_score)), 2)
-    scoring_unavailable = len(available_scores) == 0
+    final_score = round(max(0.0, min(100.0, earned / max_possible * 100.0)), 2)
 
     breakdown["final_score"] = final_score
-    breakdown["scoring_unavailable"] = scoring_unavailable
+    breakdown["scoring_unavailable"] = False
 
-    return final_score, scoring_unavailable, breakdown
+    return final_score, False, breakdown

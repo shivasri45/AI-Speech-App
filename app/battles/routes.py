@@ -59,8 +59,7 @@ def _load_prompts() -> List[Dict[str, Any]]:
     return data
 
 
-def _pick_random_prompt() -> BattlePrompt:
-    raw = random.choice(_load_prompts())
+def _to_prompt(raw: Dict[str, Any]) -> BattlePrompt:
     return BattlePrompt(
         id=str(raw.get("id", "")),
         text=str(raw.get("text", "")),
@@ -68,6 +67,17 @@ def _pick_random_prompt() -> BattlePrompt:
         focus_word=raw.get("focus_word"),
         hint=raw.get("hint"),
     )
+
+
+def _pick_random_prompts(count: int) -> List[BattlePrompt]:
+    """Pick `count` prompts, preferring distinct ones. Falls back to
+    sampling with replacement if the catalog is smaller than `count`."""
+    pool = _load_prompts()
+    if count <= len(pool):
+        chosen = random.sample(pool, count)
+    else:
+        chosen = [random.choice(pool) for _ in range(count)]
+    return [_to_prompt(raw) for raw in chosen]
 
 
 # ---------------------------------------------------------------------------
@@ -80,10 +90,11 @@ async def create_room(
     body: CreateRoomRequest,
     current_user: User = Depends(require_user),
 ) -> CreateRoomResponse:
-    prompt = _pick_random_prompt()
+    prompts = _pick_random_prompts(body.rounds)
     code, host_player_id = await room_manager.create_room(
         host_name=body.host_name.strip(),
-        prompt=prompt,
+        prompts=prompts,
+        total_rounds=body.rounds,
     )
     state = await room_manager.get_state(code)
     assert state is not None  # Just created.

@@ -9,10 +9,13 @@ interface BattleLobbyViewProps {
   onBack: () => void;
 }
 
+const ROUND_OPTIONS = [3, 5, 7] as const;
+
 export function BattleLobbyView({ onCreated, onJoined, onBack }: BattleLobbyViewProps) {
   const [hostName, setHostName] = useState("Player 1");
   const [joinName, setJoinName] = useState("Player 2");
   const [code, setCode] = useState("");
+  const [rounds, setRounds] = useState<number>(3);
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export function BattleLobbyView({ onCreated, onJoined, onBack }: BattleLobbyView
     setError(null);
     setCreating(true);
     try {
-      const response = await createRoom(hostName.trim());
+      const response = await createRoom(hostName.trim(), rounds);
       onCreated(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create room.");
@@ -95,6 +98,32 @@ export function BattleLobbyView({ onCreated, onJoined, onBack }: BattleLobbyView
               className="w-full rounded-xl bg-zinc-900/60 border border-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-fuchsia-500/60 focus:ring-1 focus:ring-fuchsia-500/40"
             />
           </label>
+
+          <div className="space-y-1.5">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">
+              Rounds (best of)
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {ROUND_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRounds(n)}
+                  className={[
+                    "rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                    rounds === n
+                      ? "border-fuchsia-500/60 bg-fuchsia-500/15 text-fuchsia-200"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700",
+                  ].join(" ")}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-zinc-600">
+              First to win {Math.floor(rounds / 2) + 1} rounds takes the match.
+            </p>
+          </div>
 
           <button
             type="button"

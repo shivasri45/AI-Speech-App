@@ -18,6 +18,7 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import field_validator
 
 
 BattleStatus = Literal[
@@ -59,13 +60,23 @@ class StarVerdict(BaseModel):
 
 
 class BattlePrompt(BaseModel):
-    """The single prompt assigned to both players in a room."""
+    """A prompt assigned to both players for one round."""
 
     id: str
     text: str
     difficulty: str
     focus_word: Optional[str] = None
     hint: Optional[str] = None
+
+
+class RoundResult(BaseModel):
+    """The finalized outcome of a single completed round."""
+
+    round_number: int
+    prompt: BattlePrompt
+    host_score: Optional[PlayerScore] = None
+    opponent_score: Optional[PlayerScore] = None
+    verdict: StarVerdict
 
 
 class PublicBattleRoomState(BaseModel):
@@ -87,6 +98,14 @@ class PublicBattleRoomState(BaseModel):
     # When a timed phase is active, the server-side deadline (unix seconds)
     # so the client can render a synced countdown without trusting wall time.
     phase_deadline: Optional[float] = None
+    # --- Multi-round fields ---
+    total_rounds: int = 1
+    current_round: int = 1
+    round_history: list[RoundResult] = Field(default_factory=list)
+    host_rounds_won: int = 0
+    opponent_rounds_won: int = 0
+    # Set only when the whole match is complete.
+    match_winner: Optional[WinnerVerdict] = None
 
 
 class BattleRoomState(BaseModel):
@@ -113,6 +132,16 @@ class BattleRoomState(BaseModel):
     phase_deadline: Optional[float] = None
     # Set when `complete` or `abandoned` so the GC can sweep stale rooms.
     closed_at: Optional[float] = None
+    # --- Multi-round state ---
+    total_rounds: int = 1
+    current_round: int = 1
+    # All prompts for the match — one per round. `prompt` mirrors the
+    # current round's entry for backward compatibility with the client.
+    prompts: list[BattlePrompt] = Field(default_factory=list)
+    round_history: list[RoundResult] = Field(default_factory=list)
+    host_rounds_won: int = 0
+    opponent_rounds_won: int = 0
+    match_winner: Optional[WinnerVerdict] = None
 
     def to_public(self) -> PublicBattleRoomState:
         scores = self.scores if (self.scores.host or self.scores.opponent) else None
@@ -128,6 +157,12 @@ class BattleRoomState(BaseModel):
             verdict=self.verdict,
             error=self.error,
             phase_deadline=self.phase_deadline,
+            total_rounds=self.total_rounds,
+            current_round=self.current_round,
+            round_history=self.round_history,
+            host_rounds_won=self.host_rounds_won,
+            opponent_rounds_won=self.opponent_rounds_won,
+            match_winner=self.match_winner,
         )
 
 
@@ -138,6 +173,16 @@ class BattleRoomState(BaseModel):
 
 class CreateRoomRequest(BaseModel):
     host_name: str = Field(min_length=1, max_length=40)
+    # Number of rounds in the match. Restricted to an odd set so there's
+    # always a decisive winner (no match-level ties).
+    rounds: int = Field(default=3)
+
+    @field_validator("rounds")
+    @classmethod
+    def _validate_rounds(cls, value: int) -> int:
+        if value not in (3, 5, 7):
+            raise ValueError("rounds must be one of 3, 5, or 7")
+        return value
 
 
 class CreateRoomResponse(BaseModel):

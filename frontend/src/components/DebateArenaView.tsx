@@ -1017,9 +1017,20 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
             <div className="text-3xl font-bold text-amber-200">
               {participantLabel(winner)}
             </div>
-            <p className="text-xs text-zinc-400">
-              Highest effective score.
-            </p>
+            {(() => {
+              const top = state?.final_standings?.find((s) => s.is_winner);
+              return top ? (
+                <p className="text-xs text-zinc-400">
+                  Highest score:{" "}
+                  <span className="text-amber-200 font-semibold">
+                    {Math.round(top.effective_score)}/100
+                  </span>{" "}
+                  — best combination of content and delivery.
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-400">Highest effective score.</p>
+              );
+            })()}
           </div>
         ) : (
           <div className="card-glass border-zinc-700/60 border-dashed p-6 text-center text-sm text-zinc-400">
@@ -1027,48 +1038,132 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
           </div>
         )}
 
-        <div className="space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold text-center">
-            Participants
-          </div>
-          <ul className="space-y-2" role="list">
-            {state?.participants.map((p) => (
-              <li
-                key={p.participant_id}
-                className={[
-                  "card-glass p-3 flex items-center gap-3",
-                  p.participant_id === state.winner_participant_id
-                    ? "border-amber-500/40 ring-1 ring-amber-500/30"
-                    : "",
-                ].join(" ")}
-              >
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white">
-                  {participantLabel(p).charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-100 truncate">
-                    {participantLabel(p)}
-                    {p.participant_id === participantId && (
-                      <span className="ml-1.5 text-[9px] uppercase tracking-widest text-brand-300 font-semibold">
-                        You
-                      </span>
+        {state?.final_standings && state.final_standings.length > 0 ? (
+          <div className="space-y-2">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold text-center">
+              Final Standings
+            </div>
+            <ul className="space-y-2" role="list">
+              {state.final_standings.map((s) => {
+                const isYou = s.participant_id === participantId;
+                return (
+                  <li
+                    key={s.participant_id}
+                    className={[
+                      "card-glass p-3 flex flex-col gap-2",
+                      s.is_winner ? "border-amber-500/40 ring-1 ring-amber-500/30" : "",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={[
+                          "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                          s.rank === 1
+                            ? "bg-amber-500/20 text-amber-300"
+                            : "bg-zinc-800 text-zinc-400",
+                        ].join(" ")}
+                      >
+                        #{s.rank}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-zinc-100 truncate">
+                          {s.display_name}
+                          {isYou && (
+                            <span className="ml-1.5 text-[9px] uppercase tracking-widest text-brand-300 font-semibold">
+                              You
+                            </span>
+                          )}
+                          {s.is_forfeit && (
+                            <span className="ml-1.5 text-[9px] uppercase tracking-widest text-rose-400 font-semibold">
+                              Forfeit
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-zinc-500">
+                          {s.content_score != null && (
+                            <>Content {Math.round(s.content_score)}/50 · </>
+                          )}
+                          Overall score
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div
+                          className={[
+                            "text-xl font-bold tabular-nums leading-none",
+                            s.is_winner ? "text-amber-300" : "text-zinc-200",
+                          ].join(" ")}
+                        >
+                          {Math.round(s.effective_score)}
+                          <span className="text-zinc-500 text-sm font-normal">/100</span>
+                        </div>
+                        {s.is_winner && (
+                          <div className="flex items-center justify-end gap-1 mt-1 text-amber-300">
+                            <Trophy className="w-3 h-3" />
+                            <span className="text-[9px] uppercase tracking-widest font-semibold">
+                              Winner
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {s.content_feedback && (
+                      <p className="text-[11px] text-zinc-400 leading-relaxed border-l-2 border-zinc-700 pl-2">
+                        {s.content_feedback}
+                      </p>
                     )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-xs text-zinc-500 text-center">
+              Scores combine speech content (via AI) and delivery. Full
+              scorecard in 'My Debates'.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold text-center">
+              Participants
+            </div>
+            <ul className="space-y-2" role="list">
+              {state?.participants.map((p) => (
+                <li
+                  key={p.participant_id}
+                  className={[
+                    "card-glass p-3 flex items-center gap-3",
+                    p.participant_id === state.winner_participant_id
+                      ? "border-amber-500/40 ring-1 ring-amber-500/30"
+                      : "",
+                  ].join(" ")}
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white">
+                    {participantLabel(p).charAt(0).toUpperCase()}
                   </div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">
-                    Speaker {p.turn_index + 1}
-                    {p.is_forfeit && " · Forfeit"}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-100 truncate">
+                      {participantLabel(p)}
+                      {p.participant_id === participantId && (
+                        <span className="ml-1.5 text-[9px] uppercase tracking-widest text-brand-300 font-semibold">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+                      Speaker {p.turn_index + 1}
+                      {p.is_forfeit && " · Forfeit"}
+                    </div>
                   </div>
-                </div>
-                {p.participant_id === state.winner_participant_id && (
-                  <Trophy className="w-4 h-4 text-amber-300" />
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-zinc-500 text-center">
-            Full scorecard available in 'My Debates' section.
-          </p>
-        </div>
+                  {p.participant_id === state.winner_participant_id && (
+                    <Trophy className="w-4 h-4 text-amber-300" />
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-zinc-500 text-center">
+              Full scorecard available in 'My Debates' section.
+            </p>
+          </div>
+        )}
 
         <div className="flex justify-center">
           <button
