@@ -375,6 +375,6 @@ class HFPhonemePronunciationProvider:
                 "model": model_name,
                 "observed_ipa": observed_ipa,
                 "observed_arpabet": observed_arpabet,
-                "expected_flat_arpabet": expected_flat,
+                "expected_flat_arpabet": [p for w in expected_per_word for p in w["phonemes"]],
             },
         )

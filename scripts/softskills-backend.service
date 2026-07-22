@@ -19,7 +19,7 @@ Environment="CSA_SERVICE_URL=http://127.0.0.1:8001"
 Environment="CSA_DATA_DIR=/home/ubuntu/softskills/outputs/ss3"
 Environment="CSA_ANALYZE_TIMEOUT_SECONDS=180"
 Environment="TEACHER_EMAILS=aviral.2428cse967@kiet.edu"
-ExecStart=/home/ubuntu/softskills/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 2
+ExecStart=/home/ubuntu/softskills/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 1
 Restart=on-failure
 RestartSec=5
 
