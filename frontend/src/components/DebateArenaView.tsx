@@ -9,8 +9,10 @@ import {
   MessageSquareText,
   Mic,
   Pause,
+  Play,
   Trophy,
   Users,
+  Volume2,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -20,6 +22,7 @@ import {
   flipReady,
   joinDebateRoom,
   uploadTurn,
+  type CompletedTurnPublic,
   type MotionPublic,
   type ParticipantPublic,
   type TurnUploadResponse,
@@ -152,6 +155,106 @@ function PausedOverlay({
         <p className="text-xs text-zinc-500">
           The turn will resume as soon as they reconnect.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function CompletedTurnsAudio({
+  completedTurns,
+  roomCode,
+}: {
+  completedTurns: CompletedTurnPublic[];
+  roomCode: string;
+}) {
+  const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handlePlay = (turn: CompletedTurnPublic) => {
+    if (!turn.audio_url) return;
+    
+    // If already playing this turn, pause it
+    if (playingTurnId === turn.participant_id) {
+      audioRef.current?.pause();
+      setPlayingTurnId(null);
+      return;
+    }
+    
+    // Stop any current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    
+    // Create new audio element and play
+    const apiBase = import.meta.env.VITE_API_URL || "";
+    const audioUrl = `${apiBase}${turn.audio_url}`;
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    
+    audio.onended = () => setPlayingTurnId(null);
+    audio.onerror = () => setPlayingTurnId(null);
+    
+    audio.play().then(() => {
+      setPlayingTurnId(turn.participant_id);
+    }).catch(() => {
+      setPlayingTurnId(null);
+    });
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  if (completedTurns.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">
+        <Volume2 className="w-3 h-3" />
+        Completed Turns
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {completedTurns.map((turn) => (
+          <div
+            key={`${turn.participant_id}-${turn.turn_index}`}
+            className="card-glass px-3 py-2 flex items-center gap-2"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white shrink-0">
+              {turn.display_name.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-zinc-100 truncate">
+                {turn.display_name}
+              </div>
+              <div className="text-[10px] text-zinc-500">
+                Speaker {turn.turn_index + 1} · {turn.ai_score.toFixed(0)}/100
+              </div>
+            </div>
+            {turn.audio_url && !turn.is_forfeit ? (
+              <button
+                type="button"
+                onClick={() => handlePlay(turn)}
+                className="btn-ghost p-2 text-zinc-400 hover:text-zinc-100"
+                aria-label={playingTurnId === turn.participant_id ? "Pause audio" : "Play audio"}
+              >
+                {playingTurnId === turn.participant_id ? (
+                  <Pause className="w-4 h-4 text-brand-300" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+              </button>
+            ) : (
+              <span className="text-[10px] text-zinc-600 px-2">
+                {turn.is_forfeit ? "Forfeit" : "No audio"}
+              </span>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1002,6 +1105,14 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
             </div>
           )}
         </div>
+        
+        {/* Audio playback for completed turns */}
+        {state?.completed_turns && state.completed_turns.length > 0 && (
+          <CompletedTurnsAudio
+            completedTurns={state.completed_turns}
+            roomCode={roomCode || ""}
+          />
+        )}
       </section>
     );
   } else if (roomState === "scoring") {

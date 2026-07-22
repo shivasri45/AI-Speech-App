@@ -25,6 +25,7 @@ import logging
 import os
 import random
 import secrets
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -36,6 +37,7 @@ from app.asr.schemas import TranscriptionResult
 from app.audio.schemas import AudioAsset
 from app.auth import User
 from app.debate.schemas import (
+    CompletedTurnPublic,
     DebateRecord,
     DebateRoom,
     DebateTurn,
@@ -524,6 +526,7 @@ class DebateRoomManager:
                 participant_id=participant.participant_id,
                 turn_index=room.active_turn_index,
                 analysis_id=analysis_id,
+                audio_url=f"/debate/rooms/{code}/audio/{uuid.uuid4().hex[:16]}",
                 ai_score=float(ai_score),
                 scoring_unavailable=bool(scoring_unavailable),
                 submitted_at=time.time(),
@@ -532,7 +535,33 @@ class DebateRoomManager:
                 content_feedback=content_feedback,
                 score_breakdown=score_breakdown,
             )
+            
+            # Copy audio file with turn_id as filename for playback
+            if audio_asset and audio_asset.processed_path:
+                import shutil
+                src_path = audio_asset.processed_path
+                # Extract extension from original file
+                ext = src_path.rsplit(".", 1)[-1] if "." in src_path else "webm"
+                dst_path = f"uploads/{turn.turn_id}.{ext}"
+                try:
+                    shutil.copy2(src_path, dst_path)
+                    # Update audio_url with correct turn_id
+                    turn = turn.model_copy(update={"audio_url": f"/debate/rooms/{code}/audio/{turn.turn_id}"})
+                except Exception as e:
+                    logger.warning(f"Failed to copy audio for playback: {e}")
+                    turn = turn.model_copy(update={"audio_url": None})
+            
             debate_turns_store.save_turn(turn)
+            
+            # Add to completed turns cache for broadcast
+            room.completed_turns_cache.append(CompletedTurnPublic(
+                turn_index=turn.turn_index,
+                participant_id=turn.participant_id,
+                display_name=participant.display_name,
+                audio_url=turn.audio_url,
+                ai_score=turn.ai_score,
+                is_forfeit=False,
+            ))
 
             # Turn accepted; cancel the pending 135s timer.
             self._cancel_timer(code, "turn")

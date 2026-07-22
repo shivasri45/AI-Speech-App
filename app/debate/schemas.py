@@ -88,6 +88,8 @@ class DebateRoom(BaseModel):
     winner_participant_id: Optional[str] = None
     # Ranked results, filled in at completion (see room_manager finalize).
     final_standings: list["FinalStanding"] = Field(default_factory=list)
+    # Cache of completed turns for audio playback broadcast
+    completed_turns_cache: list["CompletedTurnPublic"] = Field(default_factory=list)
 
     # Cumulative pause offset for the currently active turn. Used when
     # resuming after a paused overlay so the turn deadline is extended by
@@ -148,6 +150,20 @@ class FinalStanding(BaseModel):
     is_winner: bool = False
 
 
+class CompletedTurnPublic(BaseModel):
+    """Broadcast-safe view of a completed turn for audio playback.
+    
+    Includes only the fields needed for other participants to play back
+    the turn's audio and see who spoke.
+    """
+    turn_index: int
+    participant_id: str
+    display_name: str
+    audio_url: Optional[str] = None
+    ai_score: float
+    is_forfeit: bool = False
+
+
 class PublicDebateRoom(BaseModel):
     """Broadcast shape — NEVER exposes emails, WS handles, or uids.
 
@@ -168,6 +184,8 @@ class PublicDebateRoom(BaseModel):
     # Auto-start grace deadline (20s countdown shown in waiting phase).
     auto_start_deadline: Optional[float] = None
     winner_participant_id: Optional[str] = None
+    # Completed turns with audio URLs for playback by other participants.
+    completed_turns: list[CompletedTurnPublic] = Field(default_factory=list)
     # Populated only at completion so the results screen can explain the
     # outcome with ranked scores. Empty during the live debate.
     final_standings: list[FinalStanding] = Field(default_factory=list)
@@ -206,6 +224,7 @@ def to_public(room: DebateRoom) -> PublicDebateRoom:
         reconnect_deadline=room.reconnect_deadline,
         auto_start_deadline=room.auto_start_deadline,
         winner_participant_id=room.winner_participant_id,
+        completed_turns=room.completed_turns_cache,
         final_standings=room.final_standings,
     )
 
@@ -244,6 +263,7 @@ class DebateTurn(BaseModel):
     participant_id: str
     turn_index: int
     analysis_id: Optional[str] = None  # links to /analyze pipeline output
+    audio_url: Optional[str] = None  # URL to play back this turn's audio
     ai_score: float  # 0..100, clamped upstream by compute_ai_score
     scoring_unavailable: bool = False
     teacher_override_score: Optional[int] = Field(default=None, ge=0, le=100)
@@ -354,6 +374,7 @@ class TurnUploadResponse(BaseModel):
     ai_score: float
     scoring_unavailable: bool
     analysis_id: Optional[str] = None
+    audio_url: Optional[str] = None  # URL to play back this turn's audio
     content_score: Optional[float] = None  # 0-50 from LLM content analysis
     content_feedback: Optional[str] = None  # One-line feedback
     score_breakdown: Optional[dict] = None  # Full scoring breakdown

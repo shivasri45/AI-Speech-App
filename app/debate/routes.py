@@ -7,6 +7,7 @@ Endpoints (prefix ``/debate``):
 - POST   /debate/rooms/{code}/ready       → toggle ready flag
 - POST   /debate/rooms/{code}/turn        → upload turn audio (multipart)
 - GET    /debate/rooms/{code}             → fetch public room state
+- GET    /debate/rooms/{code}/audio/{turn_id} → serve turn audio file
 - GET    /debate/motions                  → list catalog of motions
 - GET    /debate/my-debates               → completed debates for caller
 - WS     /debate/ws/{code}                → live state stream + keepalive
@@ -19,6 +20,7 @@ manager's ``ValueError`` sentinels into HTTP status codes.
 from __future__ import annotations
 
 import logging
+import os
 from typing import List, Optional
 
 from fastapi import (
@@ -31,6 +33,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.auth import User, require_user, verify_token_string
@@ -185,10 +188,68 @@ async def upload_turn(
         ai_score=turn.ai_score,
         scoring_unavailable=turn.scoring_unavailable,
         analysis_id=turn.analysis_id,
+        audio_url=turn.audio_url,
         content_score=turn.content_score,
         content_feedback=turn.content_feedback,
         score_breakdown=turn.score_breakdown,
         state=to_public(updated_room),
+    )
+
+
+@router.get("/rooms/{code}/audio/{turn_id}")
+async def get_turn_audio(
+    code: str,
+    turn_id: str,
+    current_user: User = Depends(require_user),
+) -> FileResponse:
+    """Serve the audio file for a specific turn.
+    
+    Only participants in the debate can access the audio.
+    """
+    normalized = code.strip().upper()
+    room = debate_room_manager.get_state(normalized)
+    
+    # Check room exists (either in-memory or completed)
+    if room is None:
+        # Try to find in completed debates
+        turns = debate_turns_store.list_turns_for_debate_by_code(normalized)
+        if not turns:
+            raise HTTPException(status_code=404, detail="room_not_found")
+    else:
+        # Verify caller is a participant
+        participant = next(
+            (p for p in room.participants if p.user_id == current_user.uid),
+            None,
+        )
+        if participant is None:
+            raise HTTPException(status_code=403, detail="not_a_participant")
+    
+    # Find the turn
+    turns = debate_turns_store.list_turns_for_debate_by_turn_id(turn_id)
+    if not turns:
+        raise HTTPException(status_code=404, detail="turn_not_found")
+    
+    turn = turns[0]
+    if not turn.audio_url:
+        raise HTTPException(status_code=404, detail="audio_not_available")
+    
+    # Extract file path from URL (URL is like /debate/rooms/{code}/audio/{turn_id})
+    # The actual file is stored in uploads/
+    audio_path = f"uploads/{turn_id}.webm"
+    if not os.path.exists(audio_path):
+        # Try other extensions
+        for ext in ["wav", "mp3", "ogg", "m4a"]:
+            alt_path = f"uploads/{turn_id}.{ext}"
+            if os.path.exists(alt_path):
+                audio_path = alt_path
+                break
+        else:
+            raise HTTPException(status_code=404, detail="audio_file_not_found")
+    
+    return FileResponse(
+        audio_path,
+        media_type="audio/webm",
+        filename=f"turn_{turn.turn_index + 1}.webm",
     )
 
 

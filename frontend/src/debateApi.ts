@@ -37,6 +37,15 @@ export interface FinalStanding {
   is_winner: boolean;
 }
 
+export interface CompletedTurnPublic {
+  turn_index: number;
+  participant_id: string;
+  display_name: string;
+  audio_url: string | null;
+  ai_score: number;
+  is_forfeit: boolean;
+}
+
 export interface PublicDebateRoom {
   code: string;
   state: DebateState;
@@ -49,6 +58,7 @@ export interface PublicDebateRoom {
   reconnect_deadline: number | null;
   auto_start_deadline: number | null;  // 20s grace countdown before prep starts
   winner_participant_id: string | null;
+  completed_turns: CompletedTurnPublic[];  // Audio playback for completed turns
   final_standings: FinalStanding[];
 }
 
@@ -73,6 +83,7 @@ export interface TurnUploadResponse {
   ai_score: number;
   scoring_unavailable: boolean;
   analysis_id: string | null;
+  audio_url: string | null;  // URL to play back this turn's audio
   content_score: number | null;
   content_feedback: string | null;
   score_breakdown: {

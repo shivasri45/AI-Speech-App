@@ -55,6 +55,20 @@ def list_turns_for_debate(debate_id: str) -> list[DebateTurn]:
     return out
 
 
+def list_turns_for_debate_by_code(room_code: str) -> list[DebateTurn]:
+    """Return every turn that has audio, for audio serving lookup."""
+    # This is a fallback for completed debates - we don't have room_code
+    # stored in turns, so this returns empty. Audio serving primarily
+    # uses list_turns_for_debate_by_turn_id.
+    return []
+
+
+def list_turns_for_debate_by_turn_id(turn_id: str) -> list[DebateTurn]:
+    """Return the turn with matching turn_id as a list (for consistency)."""
+    turn = load_turn(turn_id)
+    return [turn] if turn else []
+
+
 def apply_teacher_review(
     turn_id: str,
     score: int,
