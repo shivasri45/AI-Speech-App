@@ -76,6 +76,11 @@ MIN_PARTICIPANTS = 1 if _DEV_MODE else 4
 MAX_PARTICIPANTS = 6
 GC_TTL_SECONDS = 60 * 60
 
+# Log dev mode status at startup
+import logging as _logging
+_startup_logger = _logging.getLogger("debate.room_manager")
+_startup_logger.info(f"DEBATE_DEV_MODE={os.getenv('DEBATE_DEV_MODE', 'NOT_SET')}, _DEV_MODE={_DEV_MODE}, MIN_PARTICIPANTS={MIN_PARTICIPANTS}")
+
 
 MOTIONS_PATH = Path("app/data/debate_motions.json")
 
@@ -362,6 +367,12 @@ class DebateRoomManager:
                 room.state == "waiting"
                 and len(room.participants) >= MIN_PARTICIPANTS
                 and all(p.is_ready for p in room.participants)
+            )
+            
+            logger.info(
+                f"flip_ready: code={code}, participants={len(room.participants)}, "
+                f"MIN_PARTICIPANTS={MIN_PARTICIPANTS}, all_ready={all(p.is_ready for p in room.participants)}, "
+                f"all_ready_condition={all_ready_condition}"
             )
             
             if all_ready_condition and len(room.participants) >= MAX_PARTICIPANTS:
