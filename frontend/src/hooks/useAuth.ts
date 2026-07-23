@@ -60,14 +60,18 @@ function readBypassUser(): AuthUser | null {
   }
 }
 
-// Apply a server-resolved role to a bypass user and persist it so the role
-// survives a page reload (localStorage is the source of truth in bypass mode).
-function persistBypassRole(
+// Apply server-resolved fields (role + avatar) to a bypass user and persist
+// them so they survive a page reload (localStorage is the source of truth in
+// bypass mode).
+function persistBypassUpdate(
   user: AuthUser,
-  role: "student" | "teacher",
+  update: { role?: "student" | "teacher"; avatarUrl?: string | null },
 ): AuthUser {
-  if (user.role === role) return user;
-  const updated: AuthUser = { ...user, role };
+  const nextRole = update.role ?? user.role;
+  const nextAvatar =
+    update.avatarUrl !== undefined ? update.avatarUrl : user.avatarUrl;
+  if (user.role === nextRole && user.avatarUrl === nextAvatar) return user;
+  const updated: AuthUser = { ...user, role: nextRole, avatarUrl: nextAvatar };
   if (typeof window !== "undefined") {
     window.localStorage.setItem(BYPASS_STORAGE_KEY, JSON.stringify(updated));
   }
@@ -122,6 +126,12 @@ export interface UseAuth {
   signOut: () => Promise<void>;
   /** Latest Firebase ID token if available. Refreshes lazily. */
   getIdToken: () => Promise<string | null>;
+  /**
+   * Re-fetch `/auth/me` and update the cached user (role + avatar). Call this
+   * after the user uploads/removes a profile photo so the header updates
+   * without a reload.
+   */
+  refreshProfile: () => Promise<void>;
 }
 
 const firebaseConfigured = isFirebaseConfigured();
@@ -148,18 +158,27 @@ interface AuthMeResponse {
   name: string | null;
   email_verified: boolean;
   role: "student" | "teacher";
+  avatar_url?: string | null;
 }
 
-async function fetchRole(token: string | null): Promise<"student" | "teacher"> {
+interface MeResult {
+  role: "student" | "teacher";
+  avatarUrl: string | null;
+}
+
+async function fetchMe(token: string | null): Promise<MeResult> {
   try {
     const response = await fetch("/auth/me", {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    if (!response.ok) return "student";
+    if (!response.ok) return { role: "student", avatarUrl: null };
     const data = (await response.json()) as AuthMeResponse;
-    return data.role === "teacher" ? "teacher" : "student";
+    return {
+      role: data.role === "teacher" ? "teacher" : "student",
+      avatarUrl: data.avatar_url ?? null,
+    };
   } catch {
-    return "student";
+    return { role: "student", avatarUrl: null };
   }
 }
 
@@ -220,9 +239,9 @@ export function useAuth(): UseAuth {
       const baseUser = firebaseUserToAuthUser(fbUser);
       setUser(baseUser);
       setLoading(false);
-      // Resolve role server-side (uses TEACHER_EMAILS allowlist).
-      const role = await fetchRole(tokenRef.current);
-      setUser((prev) => (prev ? { ...prev, role } : prev));
+      // Resolve role + avatar server-side (role uses TEACHER_EMAILS allowlist).
+      const { role, avatarUrl } = await fetchMe(tokenRef.current);
+      setUser((prev) => (prev ? { ...prev, role, avatarUrl } : prev));
     });
     return unsubscribe;
   }, []);
@@ -247,9 +266,11 @@ export function useAuth(): UseAuth {
     if (mode !== "bypass") return;
     if (!readBypassUser()) return;
     let cancelled = false;
-    void fetchRole("dev-bypass-token").then((role) => {
+    void fetchMe("dev-bypass-token").then(({ role, avatarUrl }) => {
       if (cancelled) return;
-      setUser((prev) => (prev ? persistBypassRole(prev, role) : prev));
+      setUser((prev) =>
+        prev ? persistBypassUpdate(prev, { role, avatarUrl }) : prev,
+      );
     });
     return () => {
       cancelled = true;
@@ -288,8 +309,10 @@ export function useAuth(): UseAuth {
       setUser(next);
       // Backend will tell us if this email is in TEACHER_EMAILS. Persist the
       // result so the role (and the Admin Panel tile) survives a reload.
-      void fetchRole("dev-bypass-token").then((role) => {
-        setUser((prev) => (prev ? persistBypassRole(prev, role) : prev));
+      void fetchMe("dev-bypass-token").then(({ role, avatarUrl }) => {
+        setUser((prev) =>
+          prev ? persistBypassUpdate(prev, { role, avatarUrl }) : prev,
+        );
       });
       return { ok: true };
     },
@@ -377,6 +400,18 @@ export function useAuth(): UseAuth {
     }
   }, []);
 
+  const refreshProfile = useCallback(async (): Promise<void> => {
+    const token = await getIdToken();
+    const { role, avatarUrl } = await fetchMe(token);
+    setUser((prev) => {
+      if (!prev) return prev;
+      return mode === "bypass"
+        ? persistBypassUpdate(prev, { role, avatarUrl })
+        : { ...prev, role, avatarUrl };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getIdToken]);
+
   // Register/unregister the module-level bridge so non-React modules can
   // call `getCurrentIdToken()` without subscribing to this hook.
   useEffect(() => {
@@ -397,5 +432,6 @@ export function useAuth(): UseAuth {
     signInWithGoogle,
     signOut,
     getIdToken,
+    refreshProfile,
   };
 }

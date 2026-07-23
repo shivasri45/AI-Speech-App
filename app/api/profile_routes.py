@@ -3,18 +3,36 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from app.auth import User, require_user
+from app.storage import users_store
 from app.storage._jsonl import read_jsonl
 
 logger = logging.getLogger("profile")
 
 router = APIRouter(prefix="/profile", tags=["profile"])
+
+# Where avatar images live on disk. Served publicly via the /uploads mount
+# configured in app.main.
+AVATAR_DIR = Path("uploads/avatars")
+
+# Accepted image content types -> file extension.
+_ALLOWED_IMAGE_TYPES: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
+# Cap avatar uploads to keep disk usage sane (5 MB).
+_MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -83,12 +101,17 @@ class ProfileStats(BaseModel):
 
 
 class ProfileSummaryResponse(BaseModel):
+    avatar_url: Optional[str] = None
     stats: ProfileStats
     recent_debates: List[DebateSummary]
     recent_gds: List[GDSummary]
     recent_interviews: List[InterviewSummary]
     recent_battles: List[BattleSummary]
     recent_pronunciations: List[AttemptSummary]
+
+
+class AvatarResponse(BaseModel):
+    avatar_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +125,16 @@ async def get_profile_summary(
     """Get aggregated profile data for the current user."""
     user_id = current_user.uid
     user_email = current_user.email
-    
+
+    # Resolve the stored avatar (if the user uploaded one).
+    avatar_url: Optional[str] = None
+    try:
+        record = users_store.get_by_uid(user_id)
+        if record:
+            avatar_url = record.avatar_url
+    except Exception as e:
+        logger.warning(f"Could not load avatar for {user_id}: {e}")
+
     stats = ProfileStats()
     recent_debates: List[DebateSummary] = []
     recent_gds: List[GDSummary] = []
@@ -252,6 +284,7 @@ async def get_profile_summary(
     recent_pronunciations = recent_pronunciations[:10]
     
     return ProfileSummaryResponse(
+        avatar_url=avatar_url,
         stats=stats,
         recent_debates=recent_debates,
         recent_gds=recent_gds,
@@ -259,3 +292,85 @@ async def get_profile_summary(
         recent_battles=recent_battles,
         recent_pronunciations=recent_pronunciations,
     )
+
+
+# ---------------------------------------------------------------------------
+# Avatar upload / removal
+# ---------------------------------------------------------------------------
+
+def _delete_existing_avatars(user_id: str) -> None:
+    """Remove any previously uploaded avatar files for this user.
+
+    Avatars are named ``<uid>.<ext>`` so a user can only ever have one,
+    but the extension may change between uploads (png -> jpg). Clean up
+    stale variants so we don't leave orphaned files behind.
+    """
+    if not AVATAR_DIR.exists():
+        return
+    for ext in set(_ALLOWED_IMAGE_TYPES.values()):
+        stale = AVATAR_DIR / f"{user_id}.{ext}"
+        if stale.exists():
+            try:
+                stale.unlink()
+            except OSError as e:
+                logger.warning(f"Could not delete stale avatar {stale}: {e}")
+
+
+@router.post("/avatar", response_model=AvatarResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_user),
+) -> AvatarResponse:
+    """Upload (or replace) the current user's profile photo."""
+    content_type = (file.content_type or "").lower()
+    extension = _ALLOWED_IMAGE_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported image type. Use JPEG, PNG, WebP, or GIF.",
+        )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+    if len(data) > _MAX_AVATAR_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image too large. Maximum size is 5 MB.",
+        )
+
+    AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    # Clear old files first so a png->jpg switch doesn't orphan the old one.
+    _delete_existing_avatars(current_user.uid)
+
+    filename = f"{current_user.uid}.{extension}"
+    target = AVATAR_DIR / filename
+    try:
+        target.write_bytes(data)
+    except OSError as e:
+        logger.error(f"Failed to write avatar for {current_user.uid}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save the uploaded image.",
+        )
+
+    # Cache-busting query param so the browser reloads the new image even
+    # though the path (uid-based) stays the same.
+    avatar_url = f"/uploads/avatars/{filename}?v={uuid.uuid4().hex[:8]}"
+    users_store.set_avatar(current_user.uid, avatar_url)
+    logger.info(f"Avatar updated for {current_user.uid}")
+    return AvatarResponse(avatar_url=avatar_url)
+
+
+@router.delete("/avatar", response_model=AvatarResponse)
+async def delete_avatar(
+    current_user: User = Depends(require_user),
+) -> AvatarResponse:
+    """Remove the current user's profile photo."""
+    _delete_existing_avatars(current_user.uid)
+    users_store.set_avatar(current_user.uid, None)
+    logger.info(f"Avatar removed for {current_user.uid}")
+    return AvatarResponse(avatar_url=None)

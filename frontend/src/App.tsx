@@ -87,6 +87,7 @@ export default function App() {
     signInWithEmail,
     signInWithGoogle,
     signOut,
+    refreshProfile,
   } = useAuth();
 
   const [view, setView] = useState<View>("main-menu");
@@ -543,7 +544,11 @@ export default function App() {
         )}
 
         {view === "profile" && (
-          <ProfileView user={user} onBack={handleBackToMenu} />
+          <ProfileView
+            user={user}
+            onBack={handleBackToMenu}
+            onAvatarChange={refreshProfile}
+          />
         )}
       </main>
 

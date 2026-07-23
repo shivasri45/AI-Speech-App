@@ -102,6 +102,7 @@ class RoomManager:
         host_name: str,
         prompts: list[BattlePrompt],
         total_rounds: int = 1,
+        host_avatar_url: Optional[str] = None,
     ) -> Tuple[str, str]:
         """Create a new room with a unique code and return (code, host_player_id).
 
@@ -126,6 +127,7 @@ class RoomManager:
                 room_code=code,
                 status="waiting",
                 host_name=host_name,
+                host_avatar_url=host_avatar_url,
                 host_player_id=host_player_id,
                 prompt=prompts[0],
                 prompts=prompts,
@@ -137,7 +139,12 @@ class RoomManager:
             self._sockets[code] = {}
             return code, host_player_id
 
-    async def join_room(self, room_code: str, opponent_name: str) -> str:
+    async def join_room(
+        self,
+        room_code: str,
+        opponent_name: str,
+        opponent_avatar_url: Optional[str] = None,
+    ) -> str:
         room = self._rooms.get(room_code)
         if room is None:
             raise KeyError("room_not_found")
@@ -150,6 +157,7 @@ class RoomManager:
             opponent_player_id = _new_player_id()
             room.opponent_player_id = opponent_player_id
             room.opponent_name = opponent_name
+            room.opponent_avatar_url = opponent_avatar_url
             room.status = "ready"
         await self.broadcast(room_code)
         return opponent_player_id

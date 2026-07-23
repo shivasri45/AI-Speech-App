@@ -1,5 +1,6 @@
 import { LogOut, Sparkles } from "lucide-react";
 import type { AuthUser } from "../types";
+import { Avatar } from "./Avatar";
 
 interface HeaderProps {
   user?: AuthUser | null;
@@ -46,9 +47,12 @@ export function Header({ user, onSignOut, onLogoClick }: HeaderProps) {
           {user ? (
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2 rounded-full bg-zinc-900/60 border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-fuchsia-500 flex items-center justify-center text-[10px] font-semibold text-white">
-                  {initials}
-                </div>
+                <Avatar
+                  src={user.avatarUrl}
+                  name={user.displayName || user.email}
+                  className="w-6 h-6 bg-gradient-to-br from-brand-500 to-fuchsia-500 text-[10px] font-semibold text-white"
+                  fallback={initials}
+                />
                 <span className="tracking-wide text-zinc-300 max-w-[200px] truncate">
                   {user.email}
                 </span>

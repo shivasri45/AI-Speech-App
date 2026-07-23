@@ -31,6 +31,7 @@ from pydantic import ValidationError
 from app.auth import User
 from app.auth import require_user
 from app.auth import verify_token_string
+from app.storage import users_store
 
 from .room_manager import room_manager
 from .schemas import BattlePrompt
@@ -95,6 +96,7 @@ async def create_room(
         host_name=body.host_name.strip(),
         prompts=prompts,
         total_rounds=body.rounds,
+        host_avatar_url=users_store.avatar_url_for(current_user.uid),
     )
     state = await room_manager.get_state(code)
     assert state is not None  # Just created.
@@ -120,6 +122,7 @@ async def join_room(
         opponent_player_id = await room_manager.join_room(
             room_code=code,
             opponent_name=body.opponent_name.strip(),
+            opponent_avatar_url=users_store.avatar_url_for(current_user.uid),
         )
     except KeyError:
         raise HTTPException(status_code=404, detail="room_not_found")

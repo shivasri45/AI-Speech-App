@@ -68,6 +68,17 @@ async def startup():
 app.include_router(router)
 
 
+# Serve user-uploaded files (e.g. profile avatars) at /uploads. Mounted
+# before the SPA catch-all so these paths resolve to real files on disk.
+_uploads_dir = Path("uploads")
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/uploads",
+    StaticFiles(directory=str(_uploads_dir)),
+    name="uploads",
+)
+
+
 # Optional legacy vanilla-JS frontend at /ui (kept for backward compat).
 _legacy_ui_dir = Path("app/frontend")
 if _legacy_ui_dir.is_dir():

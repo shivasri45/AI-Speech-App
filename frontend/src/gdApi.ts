@@ -18,6 +18,7 @@ export interface GDTopic {
 export interface GDParticipantPublic {
   participant_id: string;
   display_name: string;
+  avatar_url: string | null;
   is_ready: boolean;
   is_currently_speaking: boolean;
   speech_count: number;

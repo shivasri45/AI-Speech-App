@@ -40,6 +40,8 @@ export default defineConfig({
       "/interview": "http://localhost:8080",
       "/auth": "http://localhost:8080",
       "/admin": "http://localhost:8080",
+      "/profile": "http://localhost:8080",
+      "/uploads": "http://localhost:8080",
     },
   },
 });

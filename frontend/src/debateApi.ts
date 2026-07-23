@@ -20,6 +20,7 @@ export interface MotionPublic {
 export interface ParticipantPublic {
   participant_id: string;
   display_name: string;
+  avatar_url: string | null;
   is_ready: boolean;
   turn_index: number;
   is_forfeit: boolean;

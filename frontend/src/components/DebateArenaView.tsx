@@ -29,6 +29,7 @@ import {
 } from "../debateApi";
 import { useDebateSocket } from "../hooks/useDebateSocket";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import { Avatar } from "./Avatar";
 
 interface DebateArenaViewProps {
   onBack: () => void;
@@ -72,9 +73,11 @@ function ParticipantChip({
         participant.is_forfeit ? "opacity-50" : "",
       ].join(" ")}
     >
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white">
-        {participantLabel(participant).charAt(0).toUpperCase()}
-      </div>
+      <Avatar
+        src={participant.avatar_url}
+        name={participantLabel(participant)}
+        className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-semibold text-white"
+      />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-zinc-100 truncate">
           {participantLabel(participant)}
@@ -162,8 +165,11 @@ function PausedOverlay({
 
 function CompletedTurnsAudio({
   completedTurns,
+  avatarByParticipant = {},
 }: {
   completedTurns: CompletedTurnPublic[];
+  /** participant_id -> avatar URL, so turns can show the speaker's photo. */
+  avatarByParticipant?: Record<string, string | null>;
 }) {
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -222,9 +228,11 @@ function CompletedTurnsAudio({
             key={`${turn.participant_id}-${turn.turn_index}`}
             className="card-glass px-3 py-2 flex items-center gap-2"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white shrink-0">
-              {turn.display_name.charAt(0).toUpperCase()}
-            </div>
+            <Avatar
+              src={avatarByParticipant[turn.participant_id]}
+              name={turn.display_name}
+              className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-semibold text-white"
+            />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-zinc-100 truncate">
                 {turn.display_name}
@@ -1108,6 +1116,9 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
         {state?.completed_turns && state.completed_turns.length > 0 && (
           <CompletedTurnsAudio
             completedTurns={state.completed_turns}
+            avatarByParticipant={Object.fromEntries(
+              state.participants.map((p) => [p.participant_id, p.avatar_url]),
+            )}
           />
         )}
       </section>
@@ -1264,9 +1275,11 @@ export function DebateArenaView({ onBack }: DebateArenaViewProps) {
                       : "",
                   ].join(" ")}
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-semibold text-white">
-                    {participantLabel(p).charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar
+                    src={p.avatar_url}
+                    name={participantLabel(p)}
+                    className="w-9 h-9 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-semibold text-white"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-zinc-100 truncate">
                       {participantLabel(p)}

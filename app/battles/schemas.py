@@ -89,6 +89,8 @@ class PublicBattleRoomState(BaseModel):
     status: BattleStatus
     host_name: str
     opponent_name: Optional[str] = None
+    host_avatar_url: Optional[str] = None
+    opponent_avatar_url: Optional[str] = None
     prompt: Optional[BattlePrompt] = None
     host_ready: bool = False
     opponent_ready: bool = False
@@ -121,6 +123,8 @@ class BattleRoomState(BaseModel):
     status: BattleStatus = "waiting"
     host_name: str
     opponent_name: Optional[str] = None
+    host_avatar_url: Optional[str] = None
+    opponent_avatar_url: Optional[str] = None
     host_player_id: str
     opponent_player_id: Optional[str] = None
     prompt: Optional[BattlePrompt] = None
@@ -150,6 +154,8 @@ class BattleRoomState(BaseModel):
             status=self.status,
             host_name=self.host_name,
             opponent_name=self.opponent_name,
+            host_avatar_url=self.host_avatar_url,
+            opponent_avatar_url=self.opponent_avatar_url,
             prompt=self.prompt,
             host_ready=self.host_ready,
             opponent_ready=self.opponent_ready,

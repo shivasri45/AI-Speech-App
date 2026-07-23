@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Award,
   BarChart3,
   Calendar,
+  Camera,
+  Check,
   Loader2,
   MessageSquareText,
   Mic,
@@ -12,6 +14,7 @@ import {
   Users2,
   User,
   Briefcase,
+  X,
 } from "lucide-react";
 import type { AuthUser } from "../types";
 import { getCurrentIdToken } from "../hooks/useAuth";
@@ -82,6 +85,7 @@ interface ProfileStats {
 }
 
 interface ProfileData {
+  avatar_url: string | null;
   stats: ProfileStats;
   recent_debates: DebateSummary[];
   recent_gds: GDSummary[];
@@ -103,6 +107,29 @@ async function fetchProfileData(): Promise<ProfileData> {
   return res.json();
 }
 
+async function uploadAvatar(file: File): Promise<string | null> {
+  const token = await getCurrentIdToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/profile/avatar", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = `Upload failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore parse errors, keep the generic message
+    }
+    throw new Error(detail);
+  }
+  const body = (await res.json()) as { avatar_url: string | null };
+  return body.avatar_url;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -110,6 +137,8 @@ async function fetchProfileData(): Promise<ProfileData> {
 interface ProfileViewProps {
   user: AuthUser;
   onBack: () => void;
+  /** Called after the avatar changes so the app header can refresh. */
+  onAvatarChange?: () => void | Promise<void>;
 }
 
 function formatDate(dateStr: string | number): string {
@@ -127,10 +156,18 @@ function formatDate(dateStr: string | number): string {
   }
 }
 
-export function ProfileView({ user, onBack }: ProfileViewProps) {
+export function ProfileView({ user, onBack, onAvatarChange }: ProfileViewProps) {
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  // Pending selection awaiting Save/Cancel: the chosen file plus a local
+  // object-URL used only for the preview (revoked once resolved).
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +175,7 @@ export function ProfileView({ user, onBack }: ProfileViewProps) {
     try {
       const result = await fetchProfileData();
       setData(result);
+      setAvatarUrl(result.avatar_url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {
@@ -148,6 +186,76 @@ export function ProfileView({ user, onBack }: ProfileViewProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Step 1: user picks a file → stage it and show a local preview. Nothing
+  // is uploaded until they confirm with Save.
+  const handleSelectFile = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      // Reset the input so selecting the same file again still fires onChange.
+      event.target.value = "";
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        setAvatarError("Please choose an image file.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setAvatarError("Image too large. Maximum size is 5 MB.");
+        return;
+      }
+
+      setAvatarError(null);
+      // Revoke any previous preview URL before creating a new one.
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
+      setPendingFile(file);
+    },
+    [],
+  );
+
+  const clearPending = useCallback(() => {
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setPendingFile(null);
+  }, []);
+
+  // Step 2a: discard the staged photo.
+  const handleCancel = useCallback(() => {
+    setAvatarError(null);
+    clearPending();
+  }, [clearPending]);
+
+  // Step 2b: confirm → upload the staged photo and make it the avatar.
+  const handleSave = useCallback(async () => {
+    if (!pendingFile) return;
+    setUploading(true);
+    setAvatarError(null);
+    try {
+      const url = await uploadAvatar(pendingFile);
+      setAvatarUrl(url);
+      clearPending();
+      // Let the app refresh the shared user so the header updates too.
+      await onAvatarChange?.();
+    } catch (err) {
+      setAvatarError(
+        err instanceof Error ? err.message : "Failed to upload photo",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }, [pendingFile, clearPending, onAvatarChange]);
+
+  // Revoke the preview object URL if the component unmounts mid-selection.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -174,8 +282,44 @@ export function ProfileView({ user, onBack }: ProfileViewProps) {
           className="absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-br from-violet-500/25 via-fuchsia-500/15 to-transparent blur-3xl"
         />
         <div className="relative flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl font-bold text-white">
-            {user.displayName?.charAt(0).toUpperCase() || "U"}
+          <div className="relative group">
+            <div
+              className={[
+                "w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl font-bold text-white ring-2",
+                previewUrl ? "ring-brand-400/70" : "ring-white/10",
+              ].join(" ")}
+            >
+              {previewUrl || avatarUrl ? (
+                <img
+                  src={previewUrl ?? avatarUrl ?? undefined}
+                  alt={`${user.displayName || "User"} avatar`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                user.displayName?.charAt(0).toUpperCase() || "U"
+              )}
+            </div>
+            {/* Hide the "pick a file" button while previewing so the choice is
+                explicitly Save or Cancel. */}
+            {!previewUrl && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                aria-label="Change profile photo"
+                title="Change profile photo"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-zinc-900 border border-white/20 flex items-center justify-center text-zinc-200 hover:bg-zinc-800 transition disabled:opacity-60"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={handleSelectFile}
+              className="hidden"
+            />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-zinc-100">
@@ -187,6 +331,41 @@ export function ProfileView({ user, onBack }: ProfileViewProps) {
                 {user.role === "teacher" ? "Teacher" : "Student"}
               </span>
             </div>
+
+            {/* Preview confirmation: Save or Cancel the staged photo. */}
+            {previewUrl && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-zinc-400 mr-1">
+                  Preview — save this photo?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium px-3 py-1.5 transition disabled:opacity-60"
+                >
+                  {uploading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  {uploading ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-medium px-3 py-1.5 transition disabled:opacity-60"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {avatarError && (
+              <p className="mt-2 text-xs text-rose-300">{avatarError}</p>
+            )}
           </div>
         </div>
       </section>
