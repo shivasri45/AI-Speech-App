@@ -285,12 +285,22 @@ async def compute_final_scores(
     persisted_speeches: list[GDSpeechRecord],
 ) -> list[GDParticipantScore]:
     """Compute final scores for all participants after GD ends."""
-    logger.info(f"Computing final scores for GD {room.code}")
+    logger.info(f"Computing final scores for GD {room.code} with {len(persisted_speeches)} persisted speeches")
     
     # Group speeches by participant
     speeches_by_pid: dict[str, list[GDSpeechRecord]] = {}
     for sp in persisted_speeches:
         speeches_by_pid.setdefault(sp.participant_id, []).append(sp)
+    
+    # Calculate actual stats from persisted speeches (more accurate than in-memory)
+    persisted_stats: dict[str, dict] = {}
+    for pid, speeches in speeches_by_pid.items():
+        total_duration = sum(s.duration_seconds or 0.0 for s in speeches)
+        persisted_stats[pid] = {
+            "speech_count": len(speeches),
+            "total_speak_seconds": total_duration,
+        }
+        logger.info(f"Participant {pid}: {len(speeches)} speeches, {total_duration:.1f}s total")
     
     # Build combined transcripts
     all_transcripts: dict[str, str] = {}
@@ -300,6 +310,11 @@ async def compute_final_scores(
         transcripts = [s.transcript for s in speeches if s.transcript]
         all_transcripts[p.participant_id] = " ".join(transcripts) if transcripts else "(no speech)"
         display_names[p.participant_id] = p.display_name
+        
+        # Update participant with accurate persisted stats
+        stats = persisted_stats.get(p.participant_id, {"speech_count": 0, "total_speak_seconds": 0.0})
+        p.speech_count = stats["speech_count"]
+        p.total_speak_seconds = stats["total_speak_seconds"]
     
     # Only score participants who spoke
     scoreable = {pid: t for pid, t in all_transcripts.items() if t != "(no speech)"}

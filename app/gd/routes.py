@@ -254,6 +254,24 @@ async def _run_scoring(code: str) -> None:
         # Get persisted speeches
         persisted_speeches = gd_speeches_store.list_speeches_for_session(room.session_id)
         
+        logger.info(f"GD scoring: {len(persisted_speeches)} persisted speeches for session {room.session_id}")
+        
+        # Recalculate participant stats from persisted speeches (more accurate than in-memory)
+        speech_stats: dict[str, dict] = {}
+        for speech in persisted_speeches:
+            pid = speech.participant_id
+            if pid not in speech_stats:
+                speech_stats[pid] = {"count": 0, "total_seconds": 0.0}
+            speech_stats[pid]["count"] += 1
+            speech_stats[pid]["total_seconds"] += speech.duration_seconds or 0.0
+        
+        # Update room participant stats from persisted data
+        for p in room.participants:
+            stats = speech_stats.get(p.participant_id, {"count": 0, "total_seconds": 0.0})
+            logger.info(f"Participant {p.display_name}: in-memory count={p.speech_count}, persisted count={stats['count']}")
+            p.speech_count = stats["count"]
+            p.total_speak_seconds = stats["total_seconds"]
+        
         # Compute scores
         scores = await compute_final_scores(room, persisted_speeches)
         
@@ -288,6 +306,8 @@ async def _run_scoring(code: str) -> None:
         logger.info(f"GD scoring complete for {code}: {len(scores)} participants")
     except Exception as exc:
         logger.error(f"GD scoring failed for {code}: {type(exc).__name__}: {exc}")
+        import traceback
+        traceback.print_exc()
 
 
 @router.get("/rooms/{code}/results", response_model=GDResultsResponse)
