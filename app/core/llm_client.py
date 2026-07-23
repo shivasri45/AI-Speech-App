@@ -109,8 +109,7 @@ class LLMClient:
                     logger.warning(f"Could not extract JSON from LLM response: {response[:200]}")
                     return None
             
-            # Sanitize JSON string - remove/escape control characters
-            # Replace literal newlines in strings with escaped newlines
+            # Sanitize JSON string - escape control characters inside strings only
             # This handles LLM outputs that include raw newlines in feedback text
             def sanitize_json(s: str) -> str:
                 # First, try to parse as-is
@@ -120,38 +119,49 @@ class LLMClient:
                 except json.JSONDecodeError:
                     pass
                 
-                # Remove control characters except \n, \r, \t
-                sanitized = ""
+                # Replace raw newlines/tabs in string values with escaped versions
+                result = []
+                in_string = False
                 i = 0
                 while i < len(s):
                     c = s[i]
-                    if c == '\\' and i + 1 < len(s):
-                        # Keep valid escape sequences
-                        next_c = s[i + 1]
-                        if next_c in 'nrtbf"\\/':
-                            sanitized += c + next_c
-                            i += 2
-                            continue
-                        elif next_c == 'u' and i + 5 < len(s):
-                            # Unicode escape
-                            sanitized += s[i:i+6]
-                            i += 6
-                            continue
                     
-                    # Handle raw control characters in strings
+                    # Handle escape sequences
+                    if c == '\\' and i + 1 < len(s):
+                        result.append(c)
+                        result.append(s[i + 1])
+                        i += 2
+                        continue
+                    
+                    # Track string boundaries
+                    if c == '"':
+                        in_string = not in_string
+                        result.append(c)
+                        i += 1
+                        continue
+                    
+                    # Handle control characters
                     if ord(c) < 32:
-                        if c == '\n':
-                            sanitized += '\\n'
-                        elif c == '\r':
-                            sanitized += '\\r'
-                        elif c == '\t':
-                            sanitized += '\\t'
-                        # Skip other control characters
-                    else:
-                        sanitized += c
+                        if in_string:
+                            # Inside a string - escape them
+                            if c == '\n':
+                                result.append('\\n')
+                            elif c == '\r':
+                                result.append('\\r')
+                            elif c == '\t':
+                                result.append('\\t')
+                            # Skip other control characters inside strings
+                        else:
+                            # Outside string - these are formatting, keep newlines/tabs
+                            if c in '\n\r\t':
+                                result.append(c)
+                        i += 1
+                        continue
+                    
+                    result.append(c)
                     i += 1
                 
-                return sanitized
+                return ''.join(result)
             
             json_str = sanitize_json(json_str)
             return json.loads(json_str)
