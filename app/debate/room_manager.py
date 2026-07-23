@@ -54,6 +54,7 @@ from app.fluency.schemas import FluencyResult
 from app.schemas.pronunciation_schema import PronunciationResult
 from app.storage import debate_turns as debate_turns_store
 from app.storage import debates as debates_store
+from app.storage import users_store
 
 
 logger = logging.getLogger("debate.room_manager")
@@ -268,6 +269,7 @@ class DebateRoomManager:
                 user_id=user.uid,
                 user_email=user.email,
                 display_name=user.name or user.email,
+                avatar_url=users_store.avatar_url_for(user.uid),
                 joined_at=now,
                 is_ready=False,
                 turn_index=0,
@@ -324,6 +326,7 @@ class DebateRoomManager:
                 user_id=user.uid,
                 user_email=user.email,
                 display_name=user.name or user.email,
+                avatar_url=users_store.avatar_url_for(user.uid),
                 joined_at=time.time(),
                 is_ready=False,
                 turn_index=len(room.participants),

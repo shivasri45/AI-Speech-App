@@ -1,6 +1,7 @@
 import { Crown, Home, RotateCcw, Trophy, User } from "lucide-react";
 import type { PlayerRole, PlayerScore, RoomState } from "../battleApi";
 import { StarRow } from "./StarRow";
+import { Avatar } from "./Avatar";
 
 interface BattleResultViewProps {
   state: RoomState;
@@ -23,6 +24,7 @@ function ScoreLine({ label, value, suffix }: { label: string; value: number | st
 
 function PlayerScoreCard({
   name,
+  avatarUrl,
   isHost,
   isYou,
   score,
@@ -30,6 +32,7 @@ function PlayerScoreCard({
   isWinner,
 }: {
   name: string;
+  avatarUrl?: string | null;
   isHost: boolean;
   isYou: boolean;
   score: PlayerScore | null;
@@ -44,14 +47,15 @@ function PlayerScoreCard({
       ].join(" ")}
     >
       <div className="flex items-center gap-3">
-        <div
+        <Avatar
+          src={avatarUrl}
+          name={name}
           className={[
-            "w-10 h-10 rounded-full flex items-center justify-center",
+            "w-10 h-10",
             isHost ? "bg-amber-500/15 text-amber-300" : "bg-cyan-500/15 text-cyan-300",
           ].join(" ")}
-        >
-          {isHost ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
-        </div>
+          fallback={isHost ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold text-zinc-100 truncate">{name}</span>
@@ -235,6 +239,7 @@ export function BattleResultView({
       <section className="grid md:grid-cols-2 gap-4">
         <PlayerScoreCard
           name={state.host_name}
+          avatarUrl={state.host_avatar_url}
           isHost
           isYou={youAre === "host"}
           score={hostScore}
@@ -243,6 +248,7 @@ export function BattleResultView({
         />
         <PlayerScoreCard
           name={state.opponent_name ?? "Opponent"}
+          avatarUrl={state.opponent_avatar_url}
           isHost={false}
           isYou={youAre === "opponent"}
           score={oppScore}

@@ -41,6 +41,7 @@ class GDParticipantInternal(BaseModel):
     user_id: str
     user_email: str
     display_name: str
+    avatar_url: Optional[str] = None  # Profile photo, captured at join
     joined_at: float
     is_ready: bool = False
     speech_count: int = 0
@@ -100,6 +101,7 @@ class GDParticipantPublic(BaseModel):
     """Public view of participant (no PII)."""
     participant_id: str
     display_name: str
+    avatar_url: Optional[str] = None  # Profile photo (safe to expose)
     is_ready: bool
     is_currently_speaking: bool = False
     speech_count: int = 0
@@ -165,6 +167,7 @@ def to_public(room: GDRoom) -> PublicGDRoom:
             GDParticipantPublic(
                 participant_id=p.participant_id,
                 display_name=p.display_name,
+                avatar_url=p.avatar_url,
                 is_ready=p.is_ready,
                 is_currently_speaking=p.participant_id in speaking_map,
                 speech_count=p.speech_count,

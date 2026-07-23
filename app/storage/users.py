@@ -27,6 +27,7 @@ class UserRecord(BaseModel):
     role: str = "student"
     first_seen_at: str
     last_seen_at: str
+    avatar_url: Optional[str] = None
 
 
 _PATH = Path("outputs/users.jsonl")
@@ -70,6 +71,20 @@ class UsersStore:
             if user.email.lower() == normalized:
                 return user
         return None
+
+    def get_by_uid(self, firebase_uid: str) -> Optional[UserRecord]:
+        for user in self.list_all():
+            if user.firebase_uid == firebase_uid:
+                return user
+        return None
+
+    def avatar_url_for(self, firebase_uid: str) -> Optional[str]:
+        """Best-effort avatar URL lookup by uid. Never raises."""
+        try:
+            record = self.get_by_uid(firebase_uid)
+            return record.avatar_url if record else None
+        except Exception:
+            return None
 
     # --- Write ---
 
@@ -115,6 +130,31 @@ class UsersStore:
         # already in the file) doesn't pay a full rewrite cost.
         append_jsonl(self.path, new_record.model_dump())
         return new_record
+
+    def set_avatar(
+        self,
+        firebase_uid: str,
+        avatar_url: Optional[str],
+    ) -> Optional[UserRecord]:
+        """Update the stored avatar URL for a user, matched by `firebase_uid`.
+
+        Returns the updated record, or ``None`` when the user isn't found
+        (which shouldn't happen since `require_user` upserts on every
+        authenticated request).
+        """
+        users = self.list_all()
+        for index, user in enumerate(users):
+            if user.firebase_uid == firebase_uid:
+                updated = user.model_copy(
+                    update={
+                        "avatar_url": avatar_url,
+                        "last_seen_at": _now(),
+                    }
+                )
+                users[index] = updated
+                overwrite_jsonl(self.path, [u.model_dump() for u in users])
+                return updated
+        return None
 
 
 # Module-level singleton — most callers just need the default file location.

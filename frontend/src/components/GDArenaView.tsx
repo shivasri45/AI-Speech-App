@@ -38,6 +38,7 @@ import { useGDSocket } from "../hooks/useGDSocket";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useLiveKitAudio } from "../hooks/useLiveKitAudio";
 import { useToast } from "./Toast";
+import { Avatar } from "./Avatar";
 
 interface GDArenaViewProps {
   onBack: () => void;
@@ -71,8 +72,12 @@ function ParticipantCard({
         isYou ? "border-brand-500/40" : "",
       ].join(" ")}
     >
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-xs font-semibold text-white relative">
-        {participant.display_name.charAt(0).toUpperCase()}
+      <div className="relative">
+        <Avatar
+          src={participant.avatar_url}
+          name={participant.display_name}
+          className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-cyan-500 text-xs font-semibold text-white"
+        />
         {participant.is_currently_speaking && (
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />

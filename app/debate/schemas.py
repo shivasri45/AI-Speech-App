@@ -56,6 +56,7 @@ class ParticipantInternal(BaseModel):
     user_id: str  # firebase uid
     user_email: str  # NOT included in public projection
     display_name: str
+    avatar_url: Optional[str] = None  # Profile photo, captured at join
     joined_at: float  # unix seconds
     is_ready: bool = False
     # Assigned in join order on entry into `speaking`; stable thereafter.
@@ -118,6 +119,7 @@ class ParticipantPublic(BaseModel):
 
     participant_id: str
     display_name: str
+    avatar_url: Optional[str] = None  # Profile photo (safe to expose)
     is_ready: bool
     turn_index: int
     is_forfeit: bool
@@ -212,6 +214,7 @@ def to_public(room: DebateRoom) -> PublicDebateRoom:
             ParticipantPublic(
                 participant_id=p.participant_id,
                 display_name=p.display_name,
+                avatar_url=p.avatar_url,
                 is_ready=p.is_ready,
                 turn_index=p.turn_index,
                 is_forfeit=p.is_forfeit,

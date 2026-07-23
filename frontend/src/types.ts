@@ -9,6 +9,8 @@ export interface AuthUser {
   loggedInAt: string;
   /** Filled in from `GET /auth/me` after sign-in. Until then: "student". */
   role: UserRole;
+  /** Profile photo URL from `GET /auth/me`. Null until the user uploads one. */
+  avatarUrl?: string | null;
 }
 
 

@@ -17,6 +17,7 @@ import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { getCurrentIdToken } from "../hooks/useAuth";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { MicButton } from "./MicButton";
+import { Avatar } from "./Avatar";
 
 interface BattleRoomViewProps {
   roomCode: string;
@@ -90,6 +91,7 @@ function pickUploadMime(bare: string): { mime: string; ext: string } {
 
 function PlayerCard({
   name,
+  avatarUrl,
   isHost,
   isYou,
   isReady,
@@ -97,6 +99,7 @@ function PlayerCard({
   muted,
 }: {
   name: string;
+  avatarUrl?: string | null;
   isHost: boolean;
   isYou: boolean;
   isReady?: boolean;
@@ -111,14 +114,15 @@ function PlayerCard({
         isYou ? "border-brand-500/40 ring-1 ring-brand-500/30" : "",
       ].join(" ")}
     >
-      <div
+      <Avatar
+        src={avatarUrl}
+        name={name}
         className={[
-          "w-10 h-10 rounded-full flex items-center justify-center",
+          "w-10 h-10",
           isHost ? "bg-amber-500/15 text-amber-300" : "bg-cyan-500/15 text-cyan-300",
         ].join(" ")}
-      >
-        {isHost ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
-      </div>
+        fallback={isHost ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-zinc-100 truncate">{name}</span>
@@ -350,6 +354,7 @@ export function BattleRoomView({
     <div className="grid sm:grid-cols-2 gap-3">
       <PlayerCard
         name={hostName}
+        avatarUrl={state.host_avatar_url}
         isHost={true}
         isYou={youAre === "host"}
         isReady={state.host_ready}
@@ -357,6 +362,7 @@ export function BattleRoomView({
       />
       <PlayerCard
         name={opponentName ?? "Waiting for opponent…"}
+        avatarUrl={state.opponent_avatar_url}
         isHost={false}
         isYou={youAre === "opponent"}
         isReady={state.opponent_ready}

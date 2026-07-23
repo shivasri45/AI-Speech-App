@@ -8,6 +8,7 @@ def generate_filename(filename: str):
 def ensure_directories():
     directories = [
         "uploads",
+        "uploads/avatars",
         "outputs",
         "temp"
     ]

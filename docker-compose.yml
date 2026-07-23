@@ -21,6 +21,25 @@ services:
       HF_PHONEME_MODEL_NAME: ${HF_PHONEME_MODEL_NAME:-facebook/wav2vec2-lv-60-espeak-cv-ft}
       HF_HOME: /cache/huggingface
       XDG_CACHE_HOME: /cache
+      # --- Auth ---
+      # AUTH_BYPASS=true skips Firebase entirely (dev only): every request is
+      # treated as dev@kiet.edu. For real auth set this to false and provide
+      # FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS below.
+      AUTH_BYPASS: ${AUTH_BYPASS:-true}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      # --- Interview Studio (ss3 gesture microservice) ---
+      # ss3 runs on the HOST (Python 3.11 conda env), not in this container.
+      # Inside a container 127.0.0.1 is the container itself, so we reach the
+      # host via host.docker.internal. Override CSA_SERVICE_URL if ss3 runs
+      # elsewhere (e.g. its own container on the compose network).
+      CSA_SERVICE_URL: ${CSA_SERVICE_URL:-http://host.docker.internal:8001}
+      CSA_DATA_DIR: ${CSA_DATA_DIR:-/app/ss3-data}
+      CSA_ANALYZE_TIMEOUT_SECONDS: ${CSA_ANALYZE_TIMEOUT_SECONDS:-180}
+    # Makes host.docker.internal resolve to the host on Linux too (Docker
+    # Desktop for Windows/Mac provides it automatically; harmless there).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Persist downloaded model weights across container rebuilds.
       - model_cache:/cache
@@ -28,6 +47,11 @@ services:
       - app_uploads:/app/uploads
       - app_temp:/app/temp
       - app_outputs:/app/outputs
+      # Mount the host directory where ss3 writes per-session videos/reports
+      # so the teacher-review admin panel can read them. ss3 stores sessions
+      # under its own data/ folder (data/sessions/<id>/). Override SS3_DATA_DIR
+      # if you run ss3 from a different location.
+      - ${SS3_DATA_DIR:-./ss3/data}:/app/ss3-data:ro
     restart: unless-stopped
 
 volumes:

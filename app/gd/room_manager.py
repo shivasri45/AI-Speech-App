@@ -17,6 +17,7 @@ from fastapi import HTTPException, WebSocket
 
 from app.auth import User
 from app.core.livekit_client import livekit
+from app.storage import users_store
 from app.gd.schemas import (
     GDParticipantInternal,
     GDRoom,
@@ -178,6 +179,7 @@ class GDRoomManager:
                 user_id=user.uid,
                 user_email=user.email,
                 display_name=user.name or user.email,
+                avatar_url=users_store.avatar_url_for(user.uid),
                 joined_at=now,
             )
             room = GDRoom(
@@ -220,6 +222,7 @@ class GDRoomManager:
                 user_id=user.uid,
                 user_email=user.email,
                 display_name=user.name or user.email,
+                avatar_url=users_store.avatar_url_for(user.uid),
                 joined_at=time.time(),
             )
             room.participants.append(new_p)

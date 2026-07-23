@@ -57,6 +57,8 @@ export interface RoomState {
   status: BattleStatus;
   host_name: string;
   opponent_name: string | null;
+  host_avatar_url: string | null;
+  opponent_avatar_url: string | null;
   prompt: BattlePrompt | null;
   host_ready: boolean;
   opponent_ready: boolean;
