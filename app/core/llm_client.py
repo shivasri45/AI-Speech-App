@@ -97,16 +97,65 @@ class LLMClient:
             # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(1))
-            # Try to find JSON object with nested arrays/objects
-            # Find the first { and last } to capture the full JSON
-            start = response.find("{")
-            end = response.rfind("}")
-            if start != -1 and end != -1 and end > start:
-                json_str = response[start:end + 1]
-                return json.loads(json_str)
-            logger.warning(f"Could not extract JSON from LLM response: {response[:200]}")
-            return None
+                json_str = json_match.group(1)
+            else:
+                # Try to find JSON object with nested arrays/objects
+                # Find the first { and last } to capture the full JSON
+                start = response.find("{")
+                end = response.rfind("}")
+                if start != -1 and end != -1 and end > start:
+                    json_str = response[start:end + 1]
+                else:
+                    logger.warning(f"Could not extract JSON from LLM response: {response[:200]}")
+                    return None
+            
+            # Sanitize JSON string - remove/escape control characters
+            # Replace literal newlines in strings with escaped newlines
+            # This handles LLM outputs that include raw newlines in feedback text
+            def sanitize_json(s: str) -> str:
+                # First, try to parse as-is
+                try:
+                    json.loads(s)
+                    return s
+                except json.JSONDecodeError:
+                    pass
+                
+                # Remove control characters except \n, \r, \t
+                sanitized = ""
+                i = 0
+                while i < len(s):
+                    c = s[i]
+                    if c == '\\' and i + 1 < len(s):
+                        # Keep valid escape sequences
+                        next_c = s[i + 1]
+                        if next_c in 'nrtbf"\\/':
+                            sanitized += c + next_c
+                            i += 2
+                            continue
+                        elif next_c == 'u' and i + 5 < len(s):
+                            # Unicode escape
+                            sanitized += s[i:i+6]
+                            i += 6
+                            continue
+                    
+                    # Handle raw control characters in strings
+                    if ord(c) < 32:
+                        if c == '\n':
+                            sanitized += '\\n'
+                        elif c == '\r':
+                            sanitized += '\\r'
+                        elif c == '\t':
+                            sanitized += '\\t'
+                        # Skip other control characters
+                    else:
+                        sanitized += c
+                    i += 1
+                
+                return sanitized
+            
+            json_str = sanitize_json(json_str)
+            return json.loads(json_str)
+            
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parse error: {e}")
             return None
