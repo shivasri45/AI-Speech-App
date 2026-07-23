@@ -324,6 +324,11 @@ async def compute_ai_score_with_content(
     #   - content contributes up to 50
     # e.g. debate turns skip pronunciation, so max achievable = 75 and we
     # scale the (fluency + content) sum up by 100/75.
+    #
+    # IMPORTANT: If content score is 0 or very low (off-topic/irrelevant),
+    # we cap the final score severely because in a debate, CONTENT IS KING.
+    # Good fluency on garbage content should still result in a low score.
+    
     earned = 0.0
     max_possible = 0.0
     if pron_score is not None:
@@ -341,7 +346,27 @@ async def compute_ai_score_with_content(
         breakdown["scoring_unavailable"] = True
         return 0.0, True, breakdown
 
+    # Calculate base score
     final_score = round(max(0.0, min(100.0, earned / max_possible * 100.0)), 2)
+    
+    # CONTENT PENALTY: If content score is very low, cap the final score
+    # This prevents someone with good fluency but terrible/off-topic content
+    # from getting a decent score. Content is 50% weight for a reason!
+    if content_score is not None:
+        if content_score == 0:
+            # Zero content = max 15/100 final score (fluency alone shouldn't save you)
+            final_score = min(final_score, 15.0)
+            logger.info(f"Content=0 penalty applied: capping final score at 15")
+        elif content_score <= 5:
+            # Very low content (1-5/50) = max 25/100 
+            final_score = min(final_score, 25.0)
+            logger.info(f"Low content ({content_score}) penalty: capping at 25")
+        elif content_score <= 10:
+            # Low content (6-10/50) = max 40/100
+            final_score = min(final_score, 40.0)
+            logger.info(f"Low content ({content_score}) penalty: capping at 40")
+    
+    final_score = round(final_score, 2)
 
     breakdown["final_score"] = final_score
     breakdown["scoring_unavailable"] = False

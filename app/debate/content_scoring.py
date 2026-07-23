@@ -48,65 +48,47 @@ class ContentScoreResult:
 def _build_scoring_prompt(transcript: str, motion_title: str, motion_text: str) -> str:
     """Build the LLM prompt for content scoring."""
     word_count = len(transcript.split())
-    return f"""You are an EXTREMELY STRICT debate judge. Off-topic content is UNACCEPTABLE and must receive near-zero scores.
+    return f"""You are an EXTREMELY STRICT debate judge. Your feedback must quote EXACT phrases from the transcript.
 
 DEBATE MOTION: {motion_title}
 "{motion_text}"
 
-STUDENT'S SPEECH TRANSCRIPT ({word_count} words):
+STUDENT'S SPEECH ({word_count} words):
 "{transcript}"
 
-CRITICAL SCORING RULES (MUST FOLLOW):
+SCORING RULES:
 
-**OFF-TOPIC PENALTY (MOST IMPORTANT):**
-- If ANY sentence is completely unrelated to the motion → RELEVANCE must be 0-3
-- If speaker talks about random topics (food, weather, personal life) not connected to motion → ALL scores capped at 5 max each
-- Example: Motion about "technology in education" but speaker says "pizza is nice" → TOTAL SCORE should be under 15
+**OFF-TOPIC = AUTOMATIC FAIL:**
+- ANY sentence unrelated to motion → relevance: 0-3, ALL other scores: max 5 each
+- Random topics (food, personal stuff, unrelated facts) → total under 15
 
 **LENGTH REQUIREMENTS:**
-- Under 50 words = max 25% of each category
-- Under 100 words = max 50% of each category
-- A proper 2-minute turn needs 200-300 words
+- Under 50 words = all scores capped at 25%
+- Under 100 words = all scores capped at 50%
 
-**QUALITY REQUIREMENTS:**
-- Just restating the motion = relevance 0-4
-- Generic statements like "it's good/bad" without WHY = arguments 0-4
-- No examples or evidence = arguments capped at 8
+**QUALITY:**
+- Restating motion without argument = relevance 0-4
+- "It's good/bad" without WHY = arguments 0-4
 
-SCORING CRITERIA:
+CRITERIA:
+1. RELEVANCE (0-15): Every sentence must address motion
+2. ARGUMENTS (0-15): Need specific examples/evidence  
+3. STRUCTURE (0-10): Clear stance → points → conclusion
+4. VOCABULARY (0-10): Persuasive language
 
-1. RELEVANCE (0-15): 
-   - 13-15: EVERY sentence directly addresses motion with specific points
-   - 9-12: Mostly relevant but 1-2 vague/generic statements
-   - 5-8: Partially relevant, some off-topic wandering
-   - 1-4: Mostly off-topic or just restates motion
-   - 0: Completely irrelevant to the motion
+**FEEDBACK FORMAT - YOU MUST:**
+1. Quote 2-3 EXACT phrases from transcript in "quotation marks"
+2. For EACH quote, say what's wrong: off-topic/vague/unsupported/etc
+3. Give ONE specific fix suggestion
 
-2. ARGUMENTS (0-15):
-   - 13-15: Clear reasoning WITH specific real-world examples/evidence
-   - 9-12: Decent logic but vague examples
-   - 5-8: Claims without support
-   - 0-4: No arguments, just random statements
+EXAMPLE FEEDBACK:
+"Your phrase 'pizza is really delicious' is completely OFF-TOPIC - the motion is about technology. Also, 'I think it's bad' lacks evidence - say WHY with examples like 'Technology causes X because Y'. Add specific arguments with data or real-world examples."
 
-3. STRUCTURE (0-10):
-   - 8-10: Clear stance → organized points → strong conclusion
-   - 5-7: Some structure but weak
-   - 0-4: Rambling, no flow
-
-4. VOCABULARY (0-10):
-   - 8-10: Persuasive language, good word choice
-   - 5-7: Basic but acceptable
-   - 0-4: Poor vocabulary, slang, filler words
-
-**ALSO RETURN:** Set "off_topic" to true if ANY part of speech is completely unrelated to motion, false otherwise.
-
-FEEDBACK MUST:
-1. Quote specific problematic phrases in "quotation marks"
-2. Explain WHY they're wrong (off-topic, vague, unsupported)
-3. Give specific improvement suggestion
+BAD FEEDBACK (too generic):
+"The speech lacks relevance" - NO! Quote the actual problematic words!
 
 Respond with ONLY valid JSON:
-{{"relevance": <0-15>, "arguments": <0-15>, "structure": <0-10>, "vocabulary": <0-10>, "total": <0-50>, "off_topic": <true/false>, "feedback": "<detailed feedback quoting specific problems>"}}"""""""""
+{{"relevance": <0-15>, "arguments": <0-15>, "structure": <0-10>, "vocabulary": <0-10>, "total": <0-50>, "off_topic": <true/false>, "feedback": "<MUST quote exact phrases from transcript with specific criticism>"}}"""""""""
 
 
 def _create_unavailable_result(error: str) -> ContentScoreResult:
