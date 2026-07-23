@@ -19,6 +19,7 @@ from fastapi import (
 )
 
 from app.auth import User, require_user, verify_token_string
+from app.core.livekit_client import livekit
 from app.gd.room_manager import _load_topics, gd_room_manager
 from app.gd.schemas import (
     CreateGDRoomResponse,
@@ -100,6 +101,55 @@ async def get_room(
     if room is None:
         raise HTTPException(status_code=404, detail="room_not_found")
     return to_public(room)
+
+
+# ---------------------------------------------------------------------------
+# LiveKit Audio Token
+# ---------------------------------------------------------------------------
+
+@router.get("/rooms/{code}/livekit-token")
+async def get_livekit_token(
+    code: str,
+    current_user: User = Depends(require_user),
+) -> dict:
+    """Get LiveKit access token for joining audio room."""
+    normalized = code.strip().upper()
+    room = gd_room_manager.get_state(normalized)
+    if room is None:
+        raise HTTPException(status_code=404, detail="room_not_found")
+    
+    # Find participant
+    participant = next(
+        (p for p in room.participants if p.user_id == current_user.uid),
+        None,
+    )
+    if participant is None:
+        raise HTTPException(status_code=403, detail="not_a_participant")
+    
+    # Check if LiveKit is configured
+    if not livekit.is_available:
+        raise HTTPException(status_code=503, detail="livekit_not_configured")
+    
+    # Check if room has LiveKit room set
+    if not room.livekit_room:
+        raise HTTPException(status_code=400, detail="audio_not_ready")
+    
+    # Generate token
+    token = livekit.create_token(
+        room_name=room.livekit_room,
+        participant_name=participant.display_name,
+        participant_identity=participant.participant_id,
+        ttl_seconds=3600,  # 1 hour
+    )
+    
+    if not token:
+        raise HTTPException(status_code=500, detail="token_generation_failed")
+    
+    return {
+        "token": token,
+        "url": livekit.url,
+        "room": room.livekit_room,
+    }
 
 
 # ---------------------------------------------------------------------------

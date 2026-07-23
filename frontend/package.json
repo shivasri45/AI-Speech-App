@@ -13,6 +13,7 @@
     "@daily-co/daily-js": "^0.91.0",
     "chart.js": "^4.4.4",
     "firebase": "^12.15.0",
+    "livekit-client": "^2.20.2",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",

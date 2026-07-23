@@ -40,8 +40,15 @@ export interface PublicGDRoom {
   discussion_deadline: number | null;
   auto_start_deadline: number | null;
   daily_room_url: string | null;
+  livekit_room: string | null;
   scoring_started_at: number | null;
   total_speeches: number;
+}
+
+export interface LiveKitTokenResponse {
+  token: string;
+  url: string;
+  room: string;
 }
 
 export interface CreateGDRoomResponse {
@@ -249,4 +256,9 @@ export async function fetchMyGDSessions() {
   const data = await fetchJson<unknown>("/gd/my-sessions");
   if (!Array.isArray(data)) return [];
   return data;
+}
+
+export async function getLiveKitToken(code: string): Promise<LiveKitTokenResponse> {
+  const cleaned = code.trim().toUpperCase();
+  return fetchJson<LiveKitTokenResponse>(`/gd/rooms/${cleaned}/livekit-token`);
 }

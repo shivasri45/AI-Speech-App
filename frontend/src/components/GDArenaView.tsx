@@ -26,15 +26,17 @@ import {
   fetchGDTopics,
   flipGDReady,
   getGDResults,
+  getLiveKitToken,
   joinGDRoom,
   startSpeech,
   type GDParticipantPublic,
   type GDResultsResponse,
   type GDTopic,
+  type LiveKitTokenResponse,
 } from "../gdApi";
 import { useGDSocket } from "../hooks/useGDSocket";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
-import { useDailyAudio } from "../hooks/useDailyAudio";
+import { useLiveKitAudio } from "../hooks/useLiveKitAudio";
 import { useToast } from "./Toast";
 
 interface GDArenaViewProps {
@@ -127,36 +129,52 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
   const [currentSpeechId, setCurrentSpeechId] = useState<string | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
 
+  // LiveKit token state
+  const [liveKitToken, setLiveKitToken] = useState<LiveKitTokenResponse | null>(null);
+  const [liveKitError, setLiveKitError] = useState<string | null>(null);
+
   const { state, connected } = useGDSocket(roomCode, participantId);
   const recorder = useAudioRecorder();
   const toast = useToast();
-  
-  // Get participant's display name for Daily
-  const myDisplayName = useMemo(() => {
-    if (!state || !participantId) return "Participant";
-    const me = state.participants.find((p) => p.participant_id === participantId);
-    return me?.display_name || "Participant";
-  }, [state, participantId]);
 
-  // Daily.co live audio - enabled during prep and discussion phases
-  const dailyAudio = useDailyAudio({
-    roomUrl: state?.daily_room_url || null,
-    userName: myDisplayName,
-    enabled: state?.state === "prep" || state?.state === "discussion",
+  // LiveKit live audio - enabled during prep and discussion phases
+  const liveKitAudio = useLiveKitAudio({
+    serverUrl: liveKitToken?.url || null,
+    token: liveKitToken?.token || null,
+    enabled: (state?.state === "prep" || state?.state === "discussion") && !!liveKitToken,
   });
 
-  // Debug Daily audio state
+  // Fetch LiveKit token when room enters prep/discussion phase
   useEffect(() => {
-    console.log("[Daily Debug]", {
-      roomUrl: state?.daily_room_url,
+    if (!roomCode || !state?.livekit_room) return;
+    if (state.state !== "prep" && state.state !== "discussion") return;
+    if (liveKitToken) return; // Already have token
+
+    getLiveKitToken(roomCode)
+      .then((token) => {
+        setLiveKitToken(token);
+        setLiveKitError(null);
+        console.log("[LiveKit] Token received for room:", token.room);
+      })
+      .catch((err) => {
+        console.error("[LiveKit] Token fetch failed:", err);
+        setLiveKitError(err instanceof Error ? err.message : "Failed to get audio token");
+      });
+  }, [roomCode, state?.livekit_room, state?.state, liveKitToken]);
+
+  // Debug LiveKit audio state
+  useEffect(() => {
+    console.log("[LiveKit Debug]", {
+      livekitRoom: state?.livekit_room,
       roomState: state?.state,
-      dailyAudioState: {
-        isJoined: dailyAudio.isJoined,
-        isConnecting: dailyAudio.isConnecting,
-        error: dailyAudio.error,
+      hasToken: !!liveKitToken,
+      liveKitAudioState: {
+        isJoined: liveKitAudio.isJoined,
+        isConnecting: liveKitAudio.isConnecting,
+        error: liveKitAudio.error || liveKitError,
       },
     });
-  }, [state?.daily_room_url, state?.state, dailyAudio.isJoined, dailyAudio.isConnecting, dailyAudio.error]);
+  }, [state?.livekit_room, state?.state, liveKitToken, liveKitAudio.isJoined, liveKitAudio.isConnecting, liveKitAudio.error, liveKitError]);
 
   // Load topics
   useEffect(() => {
@@ -739,36 +757,36 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
         <div className="flex justify-center">
           <div className={[
             "inline-flex items-center gap-3 px-4 py-2 rounded-full border",
-            dailyAudio.isJoined
+            liveKitAudio.isJoined
               ? "bg-emerald-500/10 border-emerald-500/30"
-              : dailyAudio.isConnecting
+              : liveKitAudio.isConnecting
               ? "bg-amber-500/10 border-amber-500/30"
               : "bg-zinc-800/60 border-zinc-700/50"
           ].join(" ")}>
-            {dailyAudio.isConnecting ? (
+            {liveKitAudio.isConnecting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
                 <span className="text-sm text-amber-300">Connecting to audio...</span>
               </>
-            ) : dailyAudio.isJoined ? (
+            ) : liveKitAudio.isJoined ? (
               <>
                 <Volume2 className="w-4 h-4 text-emerald-300" />
-                <span className="text-sm text-emerald-300">Live audio connected</span>
+                <span className="text-sm text-emerald-300">Live audio connected ({liveKitAudio.participantCount})</span>
                 <button
                   type="button"
-                  onClick={dailyAudio.toggleMute}
+                  onClick={() => void liveKitAudio.toggleMute()}
                   className={[
                     "p-1.5 rounded-full transition-all",
-                    dailyAudio.isMuted
+                    liveKitAudio.isMuted
                       ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30"
                       : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
                   ].join(" ")}
-                  title={dailyAudio.isMuted ? "Unmute" : "Mute"}
+                  title={liveKitAudio.isMuted ? "Unmute" : "Mute"}
                 >
-                  {dailyAudio.isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  {liveKitAudio.isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
               </>
-            ) : dailyAudio.error ? (
+            ) : (liveKitAudio.error || liveKitError) ? (
               <>
                 <WifiOff className="w-4 h-4 text-rose-300" />
                 <span className="text-sm text-rose-300">Audio unavailable</span>
@@ -776,7 +794,7 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
             ) : (
               <>
                 <VolumeX className="w-4 h-4 text-zinc-500" />
-                <span className="text-sm text-zinc-500">No live audio</span>
+                <span className="text-sm text-zinc-500">Setting up audio...</span>
               </>
             )}
           </div>
@@ -823,33 +841,33 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
         <div className="flex justify-center">
           <div className={[
             "inline-flex items-center gap-3 px-4 py-2 rounded-full border",
-            dailyAudio.isJoined
+            liveKitAudio.isJoined
               ? "bg-emerald-500/10 border-emerald-500/30"
-              : dailyAudio.isConnecting
+              : liveKitAudio.isConnecting
               ? "bg-amber-500/10 border-amber-500/30"
               : "bg-zinc-800/60 border-zinc-700/50"
           ].join(" ")}>
-            {dailyAudio.isConnecting ? (
+            {liveKitAudio.isConnecting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
                 <span className="text-sm text-amber-300">Connecting...</span>
               </>
-            ) : dailyAudio.isJoined ? (
+            ) : liveKitAudio.isJoined ? (
               <>
                 <Phone className="w-4 h-4 text-emerald-300" />
-                <span className="text-sm text-emerald-300">Live Audio</span>
+                <span className="text-sm text-emerald-300">Live ({liveKitAudio.participantCount})</span>
                 <div className="h-4 w-px bg-zinc-600" />
                 <button
                   type="button"
-                  onClick={dailyAudio.toggleMute}
+                  onClick={() => void liveKitAudio.toggleMute()}
                   className={[
                     "flex items-center gap-1.5 px-2 py-1 rounded-full transition-all text-xs font-medium",
-                    dailyAudio.isMuted
+                    liveKitAudio.isMuted
                       ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30"
                       : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
                   ].join(" ")}
                 >
-                  {dailyAudio.isMuted ? (
+                  {liveKitAudio.isMuted ? (
                     <>
                       <VolumeX className="w-3.5 h-3.5" />
                       Muted
@@ -862,7 +880,7 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
                   )}
                 </button>
               </>
-            ) : dailyAudio.error ? (
+            ) : (liveKitAudio.error || liveKitError) ? (
               <>
                 <PhoneOff className="w-4 h-4 text-rose-300" />
                 <span className="text-sm text-rose-300">Audio failed</span>
@@ -870,7 +888,7 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
             ) : (
               <>
                 <VolumeX className="w-4 h-4 text-zinc-500" />
-                <span className="text-sm text-zinc-500">No live audio</span>
+                <span className="text-sm text-zinc-500">Setting up...</span>
               </>
             )}
           </div>
