@@ -55,6 +55,18 @@ python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 Open `http://127.0.0.1:8000` in Chrome or Edge.
 
+> **Interview Studio integration:** when this service is used as the gesture
+> backend for the main AI-Speech-App (via `CSA_SERVICE_URL`), it must listen on
+> **port 8001**, not 8000:
+>
+> ```bash
+> python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001
+> ```
+>
+> On Windows, `scripts/run-ss3-local.ps1` in the parent project handles the
+> venv setup and starts it on 8001 for you. The Dockerized backend reaches
+> this host service through `host.docker.internal:8001`.
+
 ## Run (dev mode: hot reload for UI work)
 
 Two terminals. The Vite dev server proxies API calls to the backend.

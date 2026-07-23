@@ -60,6 +60,20 @@ function readBypassUser(): AuthUser | null {
   }
 }
 
+// Apply a server-resolved role to a bypass user and persist it so the role
+// survives a page reload (localStorage is the source of truth in bypass mode).
+function persistBypassRole(
+  user: AuthUser,
+  role: "student" | "teacher",
+): AuthUser {
+  if (user.role === role) return user;
+  const updated: AuthUser = { ...user, role };
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(BYPASS_STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
 function deriveDisplayName(email: string): string {
   const local = email.split("@")[0] ?? "";
   if (!local) return "Student";
@@ -224,6 +238,24 @@ export function useAuth(): UseAuth {
     return () => window.removeEventListener("storage", handle);
   }, []);
 
+  // Bypass mode: resolve the role server-side on mount for a returning user.
+  // `readBypassUser()` restores whatever role was cached in localStorage
+  // (which starts as "student"), but the teacher allowlist (TEACHER_EMAILS)
+  // lives on the backend. Without this, a page reload would drop a teacher
+  // back to "student" and hide the Admin Panel tile.
+  useEffect(() => {
+    if (mode !== "bypass") return;
+    if (!readBypassUser()) return;
+    let cancelled = false;
+    void fetchRole("dev-bypass-token").then((role) => {
+      if (cancelled) return;
+      setUser((prev) => (prev ? persistBypassRole(prev, role) : prev));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const signInWithEmail = useCallback(
     (rawEmail: string): SignInResult => {
       if (mode !== "bypass") {
@@ -254,9 +286,10 @@ export function useAuth(): UseAuth {
       };
       window.localStorage.setItem(BYPASS_STORAGE_KEY, JSON.stringify(next));
       setUser(next);
-      // Backend will tell us if this email is in TEACHER_EMAILS.
+      // Backend will tell us if this email is in TEACHER_EMAILS. Persist the
+      // result so the role (and the Admin Panel tile) survives a reload.
       void fetchRole("dev-bypass-token").then((role) => {
-        setUser((prev) => (prev ? { ...prev, role } : prev));
+        setUser((prev) => (prev ? persistBypassRole(prev, role) : prev));
       });
       return { ok: true };
     },
