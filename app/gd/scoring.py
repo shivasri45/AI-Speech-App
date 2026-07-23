@@ -41,78 +41,77 @@ async def score_gd_content(
     """
     results: dict[str, tuple[float, str]] = {}
     
+    if not all_transcripts:
+        logger.warning("No transcripts to score")
+        return results
+    
     if not llm.is_available:
         logger.warning("LLM not available for GD content scoring")
         for pid in all_transcripts:
             results[pid] = (15.0, "Content scoring unavailable - LLM not configured")
         return results
     
-    # Build combined context
+    # Create simple numbered mapping for LLM
+    pid_list = list(all_transcripts.keys())
+    pid_to_num = {pid: f"P{i+1}" for i, pid in enumerate(pid_list)}
+    num_to_pid = {f"P{i+1}": pid for i, pid in enumerate(pid_list)}
+    
+    # Build combined context with simple IDs
     participants_text = "\n\n".join([
-        f"PARTICIPANT_{i+1} (id: {pid}):\n{transcript[:1500]}"
-        for i, (pid, transcript) in enumerate(all_transcripts.items())
+        f"{pid_to_num[pid]}:\n{transcript[:1500]}"
+        for pid, transcript in all_transcripts.items()
     ])
     
-    prompt = f"""You are a STRICT and CRITICAL GD evaluator for a professional interview setting. Score each participant's content quality.
+    prompt = f"""You are a STRICT GD evaluator. Score each participant's content quality.
 
-GD TOPIC: {topic_title}
+TOPIC: {topic_title}
 "{topic_text}"
 
-PARTICIPANTS' CONTRIBUTIONS:
+PARTICIPANTS:
 {participants_text}
 
-SCORING CRITERIA (0-30 total, be STRICT):
+Score each on CONTENT (0-30):
+- Relevance to topic (0-10)
+- Depth of ideas (0-10)
+- Clarity (0-10)
 
-1. RELEVANCE (0-10):
-   - 0-2: Completely off-topic, irrelevant rambling
-   - 3-5: Somewhat related but misses key points
-   - 6-8: Good relevance with some tangents
-   - 9-10: Perfectly on-topic throughout
+Rules:
+- Quote exact phrases to justify scores
+- Be specific about what was good/bad
+- If off-topic, mark as "OFF-TOPIC"
 
-2. DEPTH OF IDEAS (0-10):
-   - 0-2: Superficial, no examples or reasoning
-   - 3-5: Basic points with minimal elaboration
-   - 6-8: Good arguments with some examples
-   - 9-10: Deep insights, strong examples, logical reasoning
-
-3. STRUCTURE & CLARITY (0-10):
-   - 0-2: Incoherent, hard to follow
-   - 3-5: Somewhat organized but jumps around
-   - 6-8: Clear structure with good flow
-   - 9-10: Excellent organization and articulation
-
-IMPORTANT FEEDBACK RULES:
-- Quote 2-3 EXACT phrases from their transcript to justify your score
-- If content is OFF-TOPIC or IRRELEVANT, say "⚠️ OFF-TOPIC: [reason]"
-- Be specific about what was good or bad
-- For low scores (<15), explain clearly why they lost points
-- Compare participants to each other when relevant
-
-Respond with ONLY valid JSON:
-{{"scores": [{{"id": "<participant_id>", "score": <0-30>, "feedback": "<detailed feedback with quotes>"}}]}}"""
+Return JSON only:
+{{"scores": [{{"id": "P1", "score": 20, "feedback": "Good points about X. Quoted: 'exact phrase'"}}]}}"""
 
     try:
-        logger.info(f"Calling LLM for GD content scoring with {len(all_transcripts)} participants")
-        result = await llm.generate_json(prompt, max_tokens=1200)
-        logger.info(f"LLM response: {result}")
+        logger.info(f"Calling LLM for GD content scoring: {pid_to_num}")
+        result = await llm.generate_json(prompt, max_tokens=1000)
+        logger.info(f"LLM content response: {result}")
         
         if result and "scores" in result:
             for entry in result["scores"]:
-                pid = entry.get("id", "")
-                score = max(0, min(30, float(entry.get("score", 0))))
-                feedback = str(entry.get("feedback", ""))[:400]
-                results[pid] = (score, feedback)
-                logger.info(f"Scored {pid}: {score}/30")
+                num_id = entry.get("id", "")
+                # Map back to actual participant ID
+                actual_pid = num_to_pid.get(num_id)
+                if actual_pid:
+                    score = max(0, min(30, float(entry.get("score", 15))))
+                    feedback = str(entry.get("feedback", ""))[:400]
+                    results[actual_pid] = (score, feedback)
+                    logger.info(f"Scored {num_id} -> {actual_pid}: {score}/30")
+                else:
+                    logger.warning(f"Unknown participant ID from LLM: {num_id}")
         else:
-            logger.warning(f"LLM returned invalid response structure: {result}")
+            logger.warning(f"LLM returned invalid response: {result}")
     except Exception as e:
         logger.error(f"GD content scoring failed: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
     
-    # Fill in missing participants with appropriate message
+    # Fill in missing participants
     for pid in all_transcripts:
         if pid not in results:
-            logger.warning(f"No score for participant {pid}, using default")
-            results[pid] = (15.0, "Score not available - AI scoring error")
+            logger.warning(f"No score for {pid}, using default")
+            results[pid] = (15.0, "AI scoring unavailable")
     
     return results
 
@@ -128,52 +127,63 @@ async def score_listening_skills(
     """
     results: dict[str, tuple[float, str]] = {}
     
+    if not all_transcripts:
+        return results
+    
+    # For single player, skip listening scoring (no one to reference)
+    if len(all_transcripts) <= 1:
+        for pid in all_transcripts:
+            results[pid] = (7.5, "Single participant - listening N/A")
+        return results
+    
     if not llm.is_available:
         logger.warning("LLM not available for listening scoring")
         for pid in all_transcripts:
             results[pid] = (7.5, "Listening scoring unavailable")
         return results
     
+    # Simple numbered mapping
+    pid_list = list(all_transcripts.keys())
+    pid_to_num = {pid: f"P{i+1}" for i, pid in enumerate(pid_list)}
+    num_to_pid = {f"P{i+1}": pid for i, pid in enumerate(pid_list)}
+    
     participants_text = "\n\n".join([
-        f"{display_names.get(pid, pid)} (id: {pid}):\n{transcript[:1000]}"
+        f"{pid_to_num[pid]} ({display_names.get(pid, 'Unknown')}):\n{transcript[:800]}"
         for pid, transcript in all_transcripts.items()
     ])
     
-    prompt = f"""Evaluate LISTENING skills of each GD participant. Look for:
-- References to other participants' points ("As X said...", "Building on that...")
-- Building on others' ideas with new insights
-- Acknowledging different perspectives
-- Responding to what was said (not just monologuing)
+    prompt = f"""Score LISTENING skills of each GD participant (0-15).
+
+Look for:
+- References to others ("As P1 said...", "Building on that...")
+- Acknowledging others' points
 
 PARTICIPANTS:
 {participants_text}
 
-Score each on LISTENING (0-15):
-- 0-3: Never references others, only monologues
-- 4-8: Some references but mostly own points
-- 9-12: Good engagement, builds on others' ideas
-- 13-15: Excellent - weaves others' points into arguments
+Scoring:
+- 0-5: Never references others
+- 6-10: Some references
+- 11-15: Actively builds on others
 
-FEEDBACK RULES:
-- Quote EXACT phrases where they referenced others (or note absence)
-- Be specific: "Referenced X's point about..." or "Never acknowledged other speakers"
-
-Respond JSON only:
-{{"scores": [{{"id": "<participant_id>", "score": <0-15>, "feedback": "<specific feedback with quotes>"}}]}}"""
+Return JSON only:
+{{"scores": [{{"id": "P1", "score": 8, "feedback": "Referenced P2's point about X"}}]}}"""
 
     try:
-        logger.info(f"Calling LLM for listening scoring with {len(all_transcripts)} participants")
-        result = await llm.generate_json(prompt, max_tokens=800)
+        logger.info(f"Calling LLM for listening scoring: {pid_to_num}")
+        result = await llm.generate_json(prompt, max_tokens=600)
         logger.info(f"Listening LLM response: {result}")
         
         if result and "scores" in result:
             for entry in result["scores"]:
-                pid = entry.get("id", "")
-                score = max(0, min(15, float(entry.get("score", 0))))
-                feedback = str(entry.get("feedback", ""))[:250]
-                results[pid] = (score, feedback)
+                num_id = entry.get("id", "")
+                actual_pid = num_to_pid.get(num_id)
+                if actual_pid:
+                    score = max(0, min(15, float(entry.get("score", 7.5))))
+                    feedback = str(entry.get("feedback", ""))[:200]
+                    results[actual_pid] = (score, feedback)
         else:
-            logger.warning(f"Listening LLM returned invalid response: {result}")
+            logger.warning(f"Listening LLM invalid response: {result}")
     except Exception as e:
         logger.error(f"Listening scoring failed: {type(e).__name__}: {e}")
     

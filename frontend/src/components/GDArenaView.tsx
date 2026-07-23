@@ -121,7 +121,6 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentSpeechId, setCurrentSpeechId] = useState<string | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const speechStartedRef = useRef(false);
 
   const { state, connected } = useGDSocket(roomCode, participantId);
   const recorder = useAudioRecorder();
@@ -202,85 +201,90 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
     [state],
   );
 
-  // ------- PTT Handlers -------
-  const handlePTTStart = useCallback(async () => {
-    if (!roomCode || isSpeaking || speechStartedRef.current) return;
+  // ------- PTT Handlers (Click to Start/Stop instead of Hold) -------
+  const [isStartingSpeech, setIsStartingSpeech] = useState(false);
+  const [isStoppingSpeech, setIsStoppingSpeech] = useState(false);
+
+  const handleToggleSpeech = useCallback(async () => {
+    if (!roomCode) return;
     if (state?.state !== "discussion") return;
     
-    speechStartedRef.current = true;
+    // If currently speaking, stop
+    if (isSpeaking && currentSpeechId) {
+      if (isStoppingSpeech) return; // Prevent double-click
+      setIsStoppingSpeech(true);
+      setSpeechError(null);
+      
+      try {
+        // Stop recording first
+        const blob = await recorder.stop();
+        
+        // Upload to backend
+        await endSpeech(roomCode, currentSpeechId, blob);
+        
+        // Reset state
+        setIsSpeaking(false);
+        setCurrentSpeechId(null);
+        recorder.reset();
+      } catch (err) {
+        setSpeechError(err instanceof Error ? err.message : "Failed to end speech");
+        // Force reset state on error
+        setIsSpeaking(false);
+        setCurrentSpeechId(null);
+        recorder.reset();
+      } finally {
+        setIsStoppingSpeech(false);
+      }
+      return;
+    }
+    
+    // Start speaking
+    if (isStartingSpeech) return; // Prevent double-click
+    setIsStartingSpeech(true);
     setSpeechError(null);
     
     try {
       // Register with backend first
       const response = await startSpeech(roomCode);
       setCurrentSpeechId(response.speech_id);
-      setIsSpeaking(true);
       
       // Start local recording
       await recorder.start();
+      setIsSpeaking(true);
     } catch (err) {
       setSpeechError(err instanceof Error ? err.message : "Failed to start speech");
-      speechStartedRef.current = false;
-      setIsSpeaking(false);
-    }
-  }, [roomCode, isSpeaking, state?.state, recorder]);
-
-  const handlePTTStop = useCallback(async () => {
-    if (!roomCode || !isSpeaking || !currentSpeechId) return;
-    
-    try {
-      // Stop recording
-      const blob = await recorder.stop();
-      
-      // Upload to backend
-      await endSpeech(roomCode, currentSpeechId, blob);
-      
-      // Reset state
       setIsSpeaking(false);
       setCurrentSpeechId(null);
-      speechStartedRef.current = false;
-      recorder.reset();
-    } catch (err) {
-      setSpeechError(err instanceof Error ? err.message : "Failed to end speech");
-      setIsSpeaking(false);
-      setCurrentSpeechId(null);
-      speechStartedRef.current = false;
+    } finally {
+      setIsStartingSpeech(false);
     }
-  }, [roomCode, isSpeaking, currentSpeechId, recorder]);
+  }, [roomCode, isSpeaking, currentSpeechId, state?.state, recorder, isStartingSpeech, isStoppingSpeech]);
 
   // Auto-stop after 90 seconds
   useEffect(() => {
-    if (!isSpeaking) return;
+    if (!isSpeaking || !currentSpeechId) return;
     const timer = window.setTimeout(() => {
-      void handlePTTStop();
+      void handleToggleSpeech();
     }, 90 * 1000);
     return () => window.clearTimeout(timer);
-  }, [isSpeaking, handlePTTStop]);
+  }, [isSpeaking, currentSpeechId, handleToggleSpeech]);
 
-  // Space bar as alternative PTT
+  // Space bar to toggle speech
   useEffect(() => {
     if (state?.state !== "discussion") return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !e.repeat && !isSpeaking) {
+      if (e.code === "Space" && !e.repeat) {
         e.preventDefault();
-        void handlePTTStart();
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space" && isSpeaking) {
-        e.preventDefault();
-        void handlePTTStop();
+        void handleToggleSpeech();
       }
     };
     
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [state?.state, isSpeaking, handlePTTStart, handlePTTStop]);
+  }, [state?.state, handleToggleSpeech]);
 
   // ------- Lobby handlers -------
   const handleCreateRoom = useCallback(async () => {
@@ -335,25 +339,44 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
     }
   }, [roomCode]);
 
+  const [isEndingDiscussion, setIsEndingDiscussion] = useState(false);
+  
   const handleEndDiscussion = useCallback(async () => {
-    if (!roomCode) return;
+    if (!roomCode || isEndingDiscussion) return;
+    setIsEndingDiscussion(true);
     try {
+      // Stop speaking if active
+      if (isSpeaking && currentSpeechId) {
+        try {
+          const blob = await recorder.stop();
+          await endSpeech(roomCode, currentSpeechId, blob);
+          setIsSpeaking(false);
+          setCurrentSpeechId(null);
+          recorder.reset();
+        } catch {
+          // Ignore errors, just end discussion
+        }
+      }
       await endDiscussion(roomCode);
+      toast.info("Ending discussion...", "AI is processing all speeches");
     } catch (err) {
+      toast.error("Failed to end", err instanceof Error ? err.message : "Try again");
       console.warn("End discussion failed:", err);
+    } finally {
+      setIsEndingDiscussion(false);
     }
-  }, [roomCode]);
+  }, [roomCode, isEndingDiscussion, isSpeaking, currentSpeechId, recorder, toast]);
 
   const handleLeave = useCallback(() => {
-    if (isSpeaking) {
-      void handlePTTStop();
+    if (isSpeaking && currentSpeechId) {
+      void handleToggleSpeech();
     }
     setRoomCode(null);
     setParticipantId(null);
     setResults(null);
     setJoinCodeInput("");
     onBack();
-  }, [isSpeaking, handlePTTStop, onBack]);
+  }, [isSpeaking, currentSpeechId, handleToggleSpeech, onBack]);
 
   const handleCopyCode = async () => {
     if (!roomCode) return;
@@ -735,42 +758,53 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
           </div>
         )}
 
-        {/* Push-to-Talk Button */}
+        {/* Click-to-Talk Button (Toggle) */}
         <div className="flex flex-col items-center gap-3">
           <button
             type="button"
-            onMouseDown={handlePTTStart}
-            onMouseUp={handlePTTStop}
-            onMouseLeave={isSpeaking ? handlePTTStop : undefined}
-            onTouchStart={handlePTTStart}
-            onTouchEnd={handlePTTStop}
+            onClick={handleToggleSpeech}
+            disabled={isStartingSpeech || isStoppingSpeech}
             className={[
               "w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center transition-all",
               "font-bold text-lg shadow-lg select-none",
-              isSpeaking
-                ? "bg-gradient-to-br from-rose-500 to-red-600 scale-110 shadow-rose-500/50"
+              isStartingSpeech || isStoppingSpeech
+                ? "bg-zinc-600 cursor-wait"
+                : isSpeaking
+                ? "bg-gradient-to-br from-rose-500 to-red-600 scale-110 shadow-rose-500/50 animate-pulse"
                 : "bg-gradient-to-br from-emerald-500 to-cyan-500 hover:scale-105 shadow-emerald-500/30",
             ].join(" ")}
           >
             <div className="flex flex-col items-center gap-1 text-white">
-              {isSpeaking ? (
+              {isStartingSpeech ? (
+                <>
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                  <span className="text-xs">STARTING...</span>
+                </>
+              ) : isStoppingSpeech ? (
+                <>
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                  <span className="text-xs">STOPPING...</span>
+                </>
+              ) : isSpeaking ? (
                 <>
                   <Mic className="w-8 h-8" />
-                  <span className="text-xs">SPEAKING</span>
+                  <span className="text-xs">TAP TO STOP</span>
                 </>
               ) : (
                 <>
                   <MicOff className="w-8 h-8" />
-                  <span className="text-xs">HOLD TO TALK</span>
+                  <span className="text-xs">TAP TO SPEAK</span>
                 </>
               )}
             </div>
           </button>
           <p className="text-xs text-zinc-500 text-center">
-            Hold the button (or SPACE) to speak. Release to stop.
+            Tap to start speaking, tap again to stop. Or press SPACE.
           </p>
           {speechError && (
-            <div className="text-xs text-rose-300">{speechError}</div>
+            <div className="text-xs text-rose-300 bg-rose-500/10 px-3 py-1 rounded">
+              {speechError}
+            </div>
           )}
         </div>
 
@@ -799,9 +833,17 @@ export function GDArenaView({ onBack }: GDArenaViewProps) {
           <button
             type="button"
             onClick={handleEndDiscussion}
-            className="btn-ghost text-xs"
+            disabled={isEndingDiscussion}
+            className="btn-primary px-4 py-2"
           >
-            End discussion early
+            {isEndingDiscussion ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Ending...
+              </>
+            ) : (
+              "End Discussion & Get Scores"
+            )}
           </button>
         </div>
       </section>
